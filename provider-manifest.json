@@ -18,6 +18,145 @@
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_repo_context",
+      "inputSchema": {
+        "type": "object",
+        "required": ["repo_path", "keywords"],
+        "properties": {
+          "repo_path": { "type": "string" },
+          "keywords": { "type": ["string", "array"] },
+          "max_results": { "type": "number" },
+          "budget": { "type": "number" }
+        }
+      },
+      "allowedTriggers": ["user", "system"],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_pr_autofix_register",
+      "inputSchema": {
+        "type": "object",
+        "required": ["repo"],
+        "properties": {
+          "repo": { "type": "string" },
+          "base_branch": { "type": "string" },
+          "features": {
+            "type": "object",
+            "properties": {
+              "fix": { "type": "boolean" },
+              "cleanup": { "type": "boolean" },
+              "batch": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          },
+          "autofix_ref": { "type": "string" },
+          "ci_workflow_name": { "type": "string" },
+          "capabilities": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      },
+      "allowedTriggers": ["user"],
+      "effect": "write",
+      "requiresApproval": false,
+      "retrySafety": "idempotent"
+    },
+    {
+      "name": "engineering_pr_autofix_install",
+      "inputSchema": {
+        "type": "object",
+        "required": ["repo"],
+        "properties": {
+          "repo": { "type": "string" },
+          "base_branch": { "type": "string" },
+          "autofix_ref": { "type": "string" },
+          "ci_workflow_name": { "type": "string" }
+        }
+      },
+      "allowedTriggers": ["user"],
+      "effect": "write",
+      "requiresApproval": true,
+      "retrySafety": "idempotent"
+    },
+    {
+      "name": "engineering_pr_autofix_status",
+      "inputSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "repo": { "type": "string" }
+        }
+      },
+      "allowedTriggers": ["user", "system"],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_pr_autofix_disable",
+      "inputSchema": {
+        "type": "object",
+        "required": ["repo"],
+        "properties": {
+          "repo": { "type": "string" }
+        }
+      },
+      "allowedTriggers": ["user"],
+      "effect": "write",
+      "requiresApproval": false,
+      "retrySafety": "idempotent"
+    },
+    {
+      "name": "qa_log_register",
+      "inputSchema": {
+        "type": "object",
+        "required": ["name", "location", "how_to_read"],
+        "properties": {
+          "name": { "type": "string" },
+          "location": { "type": "string" },
+          "ttl": {},
+          "fields": {},
+          "how_to_read": { "type": "string" },
+          "owner": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      },
+      "allowedTriggers": ["user"],
+      "effect": "write",
+      "requiresApproval": false,
+      "retrySafety": "idempotent"
+    },
+    {
+      "name": "qa_log_lookup",
+      "inputSchema": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string" },
+          "max_results": { "type": "number" }
+        }
+      },
+      "allowedTriggers": ["user", "system"],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "qa_log_list",
+      "inputSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "allowedTriggers": ["user", "system"],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
     }
   ],
   "contextFields": [],

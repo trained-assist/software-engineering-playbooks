@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Engineering QA log registry entry",
+  "description": "Where a log is and how to read it. Never the log contents and never raw credentials.",
+  "type": "object",
+  "required": ["id", "name", "location", "how_to_read", "added_at"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "location": { "type": "string" },
+    "ttl": { "type": ["string", "number", "null"] },
+    "fields": { "type": "array", "items": { "type": "string" } },
+    "how_to_read": { "type": "string" },
+    "owner": { "type": ["string", "null"] },
+    "source": { "type": ["string", "null"] },
+    "added_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  },
+  "additionalProperties": false
+}

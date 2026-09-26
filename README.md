@@ -510,6 +510,38 @@ Lookup order:
 
 Example: once the system has proven a particular GitHub Actions/token failure mode, future agents should retrieve that evidence instead of spending another research cycle on it.
 
+## Logs library
+
+Alongside known fixes, a model should not have to re-discover *where the logs are*. The QA logs
+library is a per-profile JSON registry of log locations (`qa_log_register` /
+`qa_log_lookup` / `qa_log_list`), keyed by `USER_ID` under `~/agent-data/qa-logs/`
+(host override: `ENGINEERING_QA_LOGS_ROOT`). An entry records only metadata —
+`{ name, location, ttl, fields, how_to_read, owner, source, added_at }` — never log
+contents and never raw credentials; registrations that look like they contain secrets are
+rejected. See `contracts/qa-log.schema.json`.
+
+## pr-autofix service (slice 1)
+
+`pr-autofix` is registered per profile as a capability record, not a secret store. Slice 1 adds the
+registration store + state machine and three tools (`engineering_pr_autofix_register` /
+`engineering_pr_autofix_status` / `engineering_pr_autofix_disable`), keyed by `(USER_ID, repo)`
+under `~/agent-data/pr-autofix/` (host override: `ENGINEERING_PR_AUTOFIX_ROOT`). A registration
+records `{ repo, base_branch, features{fix,cleanup,batch}, autofix_ref, capabilities,
+ci_workflow_name, installed_workflow, status, created_at, updated_at }` and moves through
+`registered → credentials_bound → workflow_installed → active → disabled|error`. `register` is an
+idempotent upsert that never auto-enables; `disable` is the kill-switch. Raw secrets are rejected
+(`CREDENTIAL_REJECTED`) and never persisted. See `docs/PR-AUTOFIX-SERVICE.md` and
+`contracts/pr-autofix-registration.schema.json`.
+
+Slice 2a adds `engineering_pr_autofix_install` (external write, approval required): given a
+registration it builds the dedicated `.github/workflows/pr-autofix.yml` (plus
+`.github/workflows/ci-fix-cleanup.yml` when `features.cleanup`) pinned to an immutable
+`autofix_ref`, and opens — or updates — a reviewable PR to the target repo's `base_branch`. The
+installed job triggers on `workflow_run` of the repo CI workflow named by `ci_workflow_name`
+(default `"CI"`), only for failed pull-request runs that are not already `fix/ci-*`. Install is
+idempotent (identical pinned job → no PR; ref bump → update PR) and never writes credentials or
+repository Actions secrets — that is the separate, approval-gated slice 2b.
+
 ---
 
 # 10. Repository Gardener
@@ -580,6 +612,12 @@ A future repository index maintains reusable context:
 - historical hotspots.
 
 It is an acceleration layer, not a new source of truth.
+
+v1 is deterministic and shipped: a `buildIndex` entry writes `.engineering/index/`
+(revision identity/schema/timestamp, files, modules, symbols, tests, hotspots); `prepare_task`
+prefers it via `prefer_index` and falls back to raw whenever it is missing, stale or
+incompatible; `engineering_repo_context(keywords)` answers "give me context by keys, super
+fast" from the index or, failing that, the raw keyword ranking. See `docs/INDEXER.md`.
 
 Canonical product state remains:
 
@@ -692,6 +730,13 @@ Implemented today:
 - workspace `code_ready` core (`spawnWorkspace`/`statusWorkspace`/`releaseWorkspace`) with
   ownership/lease, idempotency, crash recovery, conservative release and a local proof;
 - raw-repository `prepare_task` core;
+- deterministic repository index v1 (`buildIndex` → `.engineering/index/`) plus
+  `prepare_task` `prefer_index` with automatic stale/incompatible fallback to raw;
+- `engineering_repo_context(keywords)` — fast keyword context from a fresh index or the raw
+  keyword ranking;
+- QA logs library (`qa_log_register` / `qa_log_lookup` / `qa_log_list`);
+- pr-autofix registration store + state machine (slice 1:
+  `engineering_pr_autofix_register` / `_status` / `_disable`, local state only);
 - Task Packet contract;
 - CLI surface;
 - MCP surface;
@@ -732,15 +777,26 @@ src/
     store.js
     paths.js
     errors.js
+  index/
+    build.js            # deterministic index builder
+    status.js           # compatibility / staleness checks
+    lang.js             # language detection + regex symbol scan
+    schema.js
   context-sources/
     raw-repo.js
     indexed-repo.js
+    repo-context.js     # engineering_repo_context keyword query
+  qa-logs/
+    registry.js         # per-profile log-location registry
+  pr-autofix/
+    registry.js         # per-profile pr-autofix registration store + state machine
   mcp-skills/
 
 contracts/
 playbooks/
 docs/
 examples/
+scripts/                # index-repo.js, manifest-check.js
 ```
 
 Expected future top-level capability areas include workspace management, verification, scheduler/admission, repository intelligence and engineering memory.

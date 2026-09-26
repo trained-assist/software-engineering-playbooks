@@ -31,6 +31,18 @@ function taskTerms(task) {
   return [...new Set(words.filter(w => !STOP.has(w) && !/^https?:/.test(w)))].slice(0, 18);
 }
 
+function keywordTerms(keywords) {
+  const list = (Array.isArray(keywords) ? keywords : [keywords]).filter(Boolean).map(String).join(' ');
+  const words = list.toLowerCase().match(/[a-zа-яё0-9_./-]{2,}/gi) || [];
+  return [...new Set(words.filter(w => !STOP.has(w) && !/^https?:/.test(w)))].slice(0, 24);
+}
+
+function termsFrom({ task, keywords } = {}) {
+  const hasKeywords = keywords !== undefined && keywords !== null
+    && (Array.isArray(keywords) ? keywords.length > 0 : String(keywords).trim().length > 0);
+  return hasKeywords ? keywordTerms(keywords) : taskTerms(task);
+}
+
 function listFiles(repoPath) {
   if (isGitRepo(repoPath)) {
     const tracked = run('git', ['ls-files'], repoPath, '');
@@ -166,4 +178,4 @@ function discoverRawContext({ repoPath, task, maxResults = DEFAULT_MAX_RESULTS }
   };
 }
 
-module.exports = { discoverRawContext, taskTerms, repoState };
+module.exports = { discoverRawContext, taskTerms, keywordTerms, termsFrom, scoreFile, repoState };

@@ -3,6 +3,7 @@
 
 const readline = require('readline');
 const registry = require('./registry');
+const { toolResultText } = require('./tool-result');
 const rl = readline.createInterface({ input: process.stdin, terminal: false });
 
 function send(obj) { process.stdout.write(JSON.stringify(obj) + '\n'); }
@@ -24,7 +25,7 @@ rl.on('line', async line => {
     } else if (method === 'tools/call') {
       const { name, arguments: args } = params || {};
       const value = await registry.callTool(name, args || {});
-      result(id, { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
+      result(id, { content: [{ type: 'text', text: toolResultText(name, value) }] });
     } else {
       error(id, -32601, `Method not found: ${method}`);
     }

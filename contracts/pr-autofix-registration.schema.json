@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Engineering pr-autofix registration",
+  "description": "A capability record for the pr-autofix service: which repository autofix is registered for, its pinned ref/features and its lifecycle state. Never stores credentials or secrets.",
+  "type": "object",
+  "required": ["repo", "base_branch", "features", "autofix_ref", "capabilities", "ci_workflow_name", "installed_workflow", "status", "created_at", "updated_at"],
+  "properties": {
+    "repo": { "type": "string", "pattern": "^[^/\\s]+/[^/\\s]+$" },
+    "base_branch": { "type": "string" },
+    "features": {
+      "type": "object",
+      "required": ["fix", "cleanup", "batch"],
+      "properties": {
+        "fix": { "type": "boolean" },
+        "cleanup": { "type": "boolean" },
+        "batch": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "autofix_ref": { "type": "string" },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "ci_workflow_name": { "type": "string", "description": "name: of the target repo CI workflow watched by the installed workflow_run trigger." },
+    "installed_workflow": {
+      "description": "Installation metadata only (no credentials): workflow path, pinned ref, install time and install PR URL (null when already present on the base branch).",
+      "type": ["object", "null"],
+      "required": ["path", "pinned_ref", "installed_at", "pr_url"],
+      "properties": {
+        "path": { "type": "string" },
+        "pinned_ref": { "type": "string" },
+        "installed_at": { "type": "string" },
+        "pr_url": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "enum": ["registered", "credentials_bound", "workflow_installed", "active", "disabled", "error"]
+    },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  },
+  "additionalProperties": false
+}
