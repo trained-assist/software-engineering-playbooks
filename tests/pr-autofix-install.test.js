@@ -86,6 +86,12 @@ function makeFakeGithub({ base = 'main', repo = 'trained-assist/demo', files = {
       if (!state.refs[branch]) return { status: 404, ok: false, data: { message: 'Not Found' } };
       return { status: 200, ok: true, data: { object: { sha: state.refs[branch] } } };
     }
+    if (upper === 'PATCH' && (m = route.match(/^\/repos\/([^/]+)\/([^/]+)\/git\/refs\/heads\/(.+)$/))) {
+      const branch = decodeURIComponent(m[3]);
+      if (!state.refs[branch]) return { status: 422, ok: false, data: { message: 'Reference does not exist' } };
+      state.refs[branch] = body.sha;
+      return { status: 200, ok: true, data: { object: { sha: body.sha } } };
+    }
     if (upper === 'POST' && /\/git\/refs$/.test(route)) {
       const branch = String(body.ref).replace(/^refs\/heads\//, '');
       if (state.refs[branch]) return { status: 422, ok: false, data: { message: 'Reference already exists' } };
@@ -102,6 +108,10 @@ function makeFakeGithub({ base = 'main', repo = 'trained-assist/demo', files = {
         return { status: 200, ok: true, data: { content: b64(content), sha: `blob:${filePath}` } };
       }
       const branch = body.branch;
+      // Real GitHub: updating an existing file without its blob sha is a 422.
+      if (snapshotOf(branch)[filePath] !== undefined && !body.sha) {
+        return { status: 422, ok: false, data: { message: 'Invalid request.\n\n"sha" wasn\'t supplied.' } };
+      }
       const next = { ...snapshotOf(branch) };
       next[filePath] = Buffer.from(body.content, 'base64').toString('utf8');
       const sha = newSha();
