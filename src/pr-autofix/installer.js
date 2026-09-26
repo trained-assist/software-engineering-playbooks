@@ -212,9 +212,16 @@ async function putFile(github, repo, filePath, { content, branch, sha, message }
   return res.data;
 }
 
+// No open install PR here, so an existing INSTALL_BRANCH is a leftover of a
+// merged/closed PR (squash merges keep the branch). Reset it to the base tip —
+// building on the stale head re-proposes old content and conflicts.
 async function ensureBranch(github, repo, branch, baseSha) {
   const existing = await getRef(github, repo, branch);
-  if (existing) return existing;
+  if (existing) {
+    const res = await github.ghFetch('PATCH', `/repos/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, { sha: baseSha, force: true });
+    if (!res.ok) githubError(`reset branch ${branch}`, res);
+    return res.data;
+  }
   const res = await github.ghFetch('POST', `/repos/${repo}/git/refs`, { ref: `refs/heads/${branch}`, sha: baseSha });
   if (!res.ok) githubError(`create branch ${branch}`, res);
   return res.data;
@@ -363,7 +370,9 @@ async function installAutofixWorkflow({
   await ensureBranch(cap, registration.repo, INSTALL_BRANCH, baseRef.object.sha);
   const message = prTitle({ ref: effectiveRef });
   for (const [filePath, content] of Object.entries(desired)) {
-    await putFile(cap, registration.repo, filePath, { content, branch: INSTALL_BRANCH, message });
+    // After a merged install the file already exists on base → GitHub needs its sha.
+    const existing = await getFile(cap, registration.repo, filePath, INSTALL_BRANCH);
+    await putFile(cap, registration.repo, filePath, { content, branch: INSTALL_BRANCH, sha: existing && existing.sha, message });
   }
   const pr = await createPull(cap, registration.repo, {
     title: message,
