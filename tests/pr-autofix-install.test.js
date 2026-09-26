@@ -26,6 +26,7 @@ const {
   CLEANUP_WORKFLOW_PATH,
   INSTALL_BRANCH,
 } = require('../src/pr-autofix');
+const { DEFAULT_AUTOFIX_REF } = require('../src/pr-autofix/constants');
 const { callTool } = require('../src/mcp-skills/registry');
 
 const cleanup = [];
@@ -361,7 +362,7 @@ test('engineering_pr_autofix_install runs through the registry with an injected 
   await callTool('engineering_pr_autofix_register', { repo: 'trained-assist/demo' });
   const installed = await callTool('engineering_pr_autofix_install', { repo: 'trained-assist/demo' });
   assert.equal(installed.created, true);
-  assert.equal(installed.pinned_ref, 'v1.2.1');
+  assert.equal(installed.pinned_ref, DEFAULT_AUTOFIX_REF); // tool default, not a fixture literal
 
   const status = await callTool('engineering_pr_autofix_status', { repo: 'trained-assist/demo' });
   assert.equal(status.registrations[0].status, 'workflow_installed');
