@@ -25,7 +25,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: trained-assist/pr-autofix/.github/workflows/autofix-callable.yml@v1.5.2
+    uses: trained-assist/pr-autofix/.github/workflows/autofix-callable.yml@v1.5.3
     with:
       pr_number: ${{ github.event.workflow_run.pull_requests[0].number }}
       original_branch: ${{ github.event.workflow_run.head_branch }}
