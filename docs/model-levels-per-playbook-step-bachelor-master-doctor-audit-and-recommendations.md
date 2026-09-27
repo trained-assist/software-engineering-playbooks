@@ -91,55 +91,61 @@
 
 ---
 
-## 3. Рекомендации по уровням
+## 3. Решение владельца (2026-09-27): researcher → Hermes/Gemini, остальное master, иногда doctor
 
-### 3.1. Понизить до бесплатной лестницы (`free`)
+### 3.1. Роль `researcher` → Hermes на Gemini
 
-| Шаг | Почему можно |
-|---|---|
-| `implement` | Самый дорогой шаг и главная экономия. После `sandbox` и `propose-change` сложные решения уже приняты, слайсы маленькие, песочница и тесты ловят ошибки. Это ровно тот класс задач, где одна модель чинит PR в ~97% случаев. Начинать с `free`, эскалация уже есть |
-| `ci-green` (починка красного CI) | Тот же сценарий, что у pr-autofix |
-| `verify-local`, `open-pr`, `plan-declaration`, `repo-bootstrap` | Механика: git, gh, запуск команд, шаблон текста |
-| `explore-context`, `bug-context`, `infra-discovery` | Поиск делают инструменты (`engineering_repo_context`, `rg`, `gh`, логи), модель только суммирует. Нужен большой контекст, а не ум |
-| `deployed`, `observe`, `confirm-fixed` | Решение по правилу, ожидание без модели |
-| `archive` | Правка текстов по шаблону. Сжатие журнала — классическая задача для дешёвой модели |
+Исследователь только собирает контекст и пишет отчёт. Он ни за что не отвечает: не коммитит, не открывает PR и не отмечает пункты чек-листа. Ошибка в его отчёте ловится следующим шагом, который отчёт читает. Поэтому такой шаг можно отдать дешёвой модели с большим контекстом. Gemini хорошо подходит для исследований (решение владельца, см. README trained-assist-llm-ladder: «research / presentation / vision остаются на Gemini»).
 
-### 3.2. Поднять до `doctor` (Claude)
+Под это правило попадают только шаги, которые **чистое исследование**:
+
+| Шаг | Сейчас | Станет |
+|---|---|---|
+| `explore-context` | researcher / bachelor | researcher → Gemini |
+| `bug-context` | researcher / bachelor | researcher → Gemini |
+| `infra-discovery` | researcher / bachelor | researcher → Gemini |
+
+У двух шагов роль `researcher`, но они **отвечают за результат**, на котором стоит весь план. Их надо перевести в другую роль, иначе они тоже уедут на Gemini:
+
+| Шаг | Почему это не чистое исследование | Предложение |
+|---|---|---|
+| `define-use-case` | Пишет user story — вход для тестов и проверки; ведёт диалог с юзером | роль `reviewer`, уровень master (в `new-software` — doctor) |
+| `root-cause` | Выносит диагноз, по которому делают фикс | роль `developer`, уровень master; doctor, если R < 5 |
+
+**Что есть сейчас:**
+- `hermes_run` — Gemini 2.5 Flash (`google/gemini-2.5-flash` через OpenRouter), но это один вызов LLM **без инструментов**: читать репо, `gh` и логи он не может.
+- `hermes_research` ходит в интернет, но движок у него по умолчанию **Claude**.
+
+Готового «Hermes на Gemini с инструментами» нет, это шаг 2 в разделе 4.
+
+### 3.2. Всё остальное — `master` по умолчанию
+
+`bachelor` фактически уходит: механические шаги (open-pr, verify-local, deployed, bootstrap, ожидание CI) выносятся в MCP-методы и программные ожидания (раздел 5), модель там не нужна или нужна на минимум. Оставшиеся агентские шаги работают на `master` (Go-лестница `deepseek`): implement, починка CI, propose для простых изменений, reproduce, go-live, verify-real, archive, observe, confirm-fixed, sandbox в `feature`.
+
+### 3.3. `doctor` (Claude) — по условию
 
 | Шаг | Когда | Почему |
 |---|---|---|
-| `requirements-complexity` | если найден 🔴 или ⚫ | Самый дорогой класс ошибок: права доступа, роли, неоднозначности. Разметить флаги может дешёвая модель, челленджить 🔴/⚫ — сильная |
-| `propose-change` | если флаги 🟡+ или затронуто несколько модулей | Ошибку дизайна тесты не поймают |
-| `sandbox` | в `new-software` всегда | От песочницы зависит скорость всего проекта, и есть риск получить песочницу, которая ничего не проверяет |
-| `root-cause` | если R < 5 (воспроизвести не удалось) | Там только рассуждения. При R5 с `git bisect` справится и дешёвая модель в цикле |
-| `define-use-case` | в `new-software` | От него зависит весь план. Для `feature` достаточно `master` |
-| **новый шаг `review`** | перед `open-pr` / merge | Сейчас независимого ревью диффа нет. Чтение диффа дешёвое по токенам, а сильная модель, отличная от автора, ловит то, мимо чего проходят тесты. Лучшее место для Claude |
+| `requirements-complexity` | найден 🔴 или ⚫ | Самый дорогой класс ошибок: права доступа, роли, неоднозначности. Разметить флаги может master, челленджить 🔴/⚫ — doctor |
+| `propose-change` | флаги 🟡+ или несколько модулей | Ошибку дизайна тесты не поймают |
+| `solution-options` | в `new-software` (уже doctor) | Архитектура с нуля |
+| `sandbox` | в `new-software` | От песочницы зависит скорость всего проекта |
+| `define-use-case` | в `new-software` | От него зависит весь план |
+| `root-cause` | R < 5 (воспроизвести не удалось) | Там только рассуждения |
+| **новый шаг `review`** | перед `open-pr` / merge, всегда | Независимое ревью диффа моделью, отличной от автора. Чтение диффа дешёвое по токенам, а ловит то, мимо чего проходят тесты |
 
-### 3.3. Оставить `master`
-
-`reproduce`, `go-live`, `verify-real`, `propose-change` для простых 🟢-изменений.
-
----
-
-## 4. Что нужно сделать в коде, чтобы уровни заработали
-
-1. **Развести профили.** Сейчас `bachelor` = `master`. Предложение:
-
-   ```json
-   PLAYBOOK_LEVEL_MAP={"bachelor":{"engine":"opencode","ocProfile":"free"},
-                       "master":{"engine":"opencode","ocProfile":"deepseek"},
-                       "doctor":{"engine":"claude","ocProfile":null}}
-   ```
-
-   Профиль `.opencode/profiles/free.json` уже есть. Это правка env или `DEFAULT_LEVEL_MAP`, не архитектуры. Заодно эскалация bachelor → master станет настоящей.
-
-2. **Условный уровень.** Сейчас уровень статичен в шаблоне. Нужно, чтобы шаг мог поднять или опустить уровень **следующего** шага по своим выводам: нашёл 🔴 → `propose-change` становится `doctor`; достиг R5 → `root-cause` опускается до `bachelor`. Минимально: разрешить `task_item_update(item_id, minimum_model_level)`. Сейчас он меняет только `validation_mode`.
-
-3. **Шаг `review`** в библиотеке: роль reviewer, уровень doctor, вход — дифф PR, сценарий и план проверки; выход — замечания или «ок». Вставить в `apply` перед `open-pr` во всех трёх плейбуках.
-
-4. **Кросс-модельность ревью.** Модель ревью не должна совпадать с моделью автора. При карте выше это выполняется автоматически: автор на opencode, ревьюер на Claude.
+Итог: **почти везде master, иногда doctor, исследование — Gemini.**
 
 ---
+
+## 4. Что нужно сделать в коде
+
+1. **Карта уровней + роль.** Сейчас движок выбирается только по уровню. Нужно правило по роли поверх уровня: `researcher` → Gemini-профиль, остальные роли — по уровню (`master` → opencode `deepseek`, `doctor` → Claude). Место — `resolveStepExecution` в `src/playbook-executor.js`, конфиг — `PLAYBOOK_LEVEL_MAP` плюс новая `PLAYBOOK_ROLE_MAP`.
+2. **Hermes на Gemini с инструментами.** Opencode-профиль `research` (`.opencode/profiles/research.json`) с моделью Gemini через OpenRouter (`google/gemini-2.5-flash`, при нехватке — `gemini-2.5-pro`). Opencode даёт инструменты (rg, gh, чтение файлов, MCP-скилы), Gemini — модель. Тот же профиль стоит отдать `hermes_research` вместо дефолтного Claude: веб-исследование станет дешевле.
+3. **Роли в библиотеке шагов** (`library/step-types.json`): `define-use-case` → reviewer, `root-cause` → developer (раздел 3.1).
+4. **Условный уровень.** Шаг может поднять уровень **следующего** шага по своим выводам: нашёл 🔴 → `propose-change` становится doctor; достиг R5 → `root-cause` остаётся master. Минимально — разрешить `task_item_update(item_id, minimum_model_level)`; сейчас он меняет только `validation_mode`.
+5. **Шаг `review`** в библиотеке: роль reviewer, уровень doctor, вход — дифф PR, сценарий и план проверки. Вставить перед `open-pr` во всех трёх плейбуках.
+6. **Эскалация.** При master по умолчанию лестница `bachelor → master` исчезает, эскалация шага — сразу master → doctor. Для researcher на Gemini при провале — перезапуск на master.
 
 ## 5. Какие шаги вынести в MCP-методы (и сделать проще)
 
@@ -147,14 +153,14 @@
 
 | Метод | Заменяет | Модель после выноса |
 |---|---|---|
-| `engineering_open_pr(workspace, issue)` | `open-pr`: проверка ветки, push, PR по шаблону, URL в итог, коммент в issue | `free` только для текста PR |
-| `engineering_sync_issue(plan)` | `plan-declaration`: создать или обновить issue из разделов плана («бумаги учёного») | `free` или без модели |
-| `engineering_verify(workspace)` | `verify-local`: один раз вычитать команды CI из `.github/workflows` (или взять из `.engineering/project.yml`) и прогнать их | только на красный — `free` с эскалацией |
+| `engineering_open_pr(workspace, issue)` | `open-pr`: проверка ветки, push, PR по шаблону, URL в итог, коммент в issue | master — только текст PR |
+| `engineering_sync_issue(plan)` | `plan-declaration`: создать или обновить issue из разделов плана («бумаги учёного») | без модели или master для текста |
+| `engineering_verify(workspace)` | `verify-local`: один раз вычитать команды CI из `.github/workflows` (или взять из `.engineering/project.yml`) и прогнать их | только на красный — master, эскалация в doctor |
 | Проверка деплоя по конфигу репо | `deployed`: URL health-эндпоинта один раз записан в конфиг репо → чистое ожидание `http_ok` + commit | без модели |
 | Программное ожидание CI | `ci-green`: ждать без агента, агента запускать только на красном CI | без модели, пока не красный |
-| `engineering_bug_context(service, time)` | `bug-context`: логи за окно, `git log --since`, деплои, похожие issues одной выборкой | `free` — суммировать |
+| `engineering_bug_context(service, time)` | `bug-context`: логи за окно, `git log --since`, деплои, похожие issues одной выборкой | researcher → Gemini — суммировать |
 | Скаффолд репо (`dev_new_repo` + шаблон) | `repo-bootstrap`: README, симлинк CLAUDE.md, requirements-log, CI | без модели |
-| Шаблоны `archive` | requirements-log, итоговый коммент и закрытие issue | `free` — только сжатие журнала |
+| Шаблоны `archive` | requirements-log, итоговый коммент и закрытие issue | master — только сжатие журнала |
 
 ---
 
@@ -162,18 +168,17 @@
 
 | Где выполняется | Сейчас | После |
 |---|---|---|
-| Без модели (программно / MCP) | 1 шаг на плейбук (`merged`) | ~5–6 шагов на плейбук (merged, deployed, ожидание CI, verify, open-pr, bootstrap) |
-| `free` (бесплатная лестница) | 0 | ~5–7: implement, починка CI, explore, bug-context, archive, observe, confirm-fixed |
-| `deepseek` (Go-лестница) | почти всё | 2–4: define-use-case, reproduce, go-live, verify-real, простой propose |
-| Claude (`doctor`) | 1 шаг на три плейбука | 3–4 по условию: флаги 🔴/⚫, сложный дизайн, песочница нового софта, root-cause без репро, **review** |
-
-Ожидаемый эффект: дорогая модель тратится только на суждения, которые ничто потом не проверит, и на ревью. Остальная работа идёт бесплатно, и ошибки ловят тесты, песочница и эскалация.
+| Без модели (программно / MCP) | 1 шаг на плейбук (`merged`) | ~5–6 шагов (merged, deployed, ожидание CI, verify, open-pr, bootstrap) |
+| Gemini (researcher) | 0 | 1–2 шага на плейбук: explore-context, bug-context, infra-discovery |
+| `master` (opencode `deepseek`) | почти всё | основная работа: implement, починка CI, reproduce, go-live, verify-real, archive, простой propose |
+| Claude (`doctor`) | 1 шаг на три плейбука | 3–5 по условию: флаги 🔴/⚫, сложный дизайн, архитектура и песочница нового софта, root-cause без репро, **review** |
 
 ---
 
 ## 7. Порядок работ
 
-1. Карта уровней (`PLAYBOOK_LEVEL_MAP` / `DEFAULT_LEVEL_MAP`) и правка уровней в `library/step-types.json` по разделу 3. Маленький PR, эффект сразу.
-2. Шаг `review` в библиотеке и во всех трёх плейбуках.
-3. Условный уровень: `task_item_update(minimum_model_level)` плюс инструкции в `requirements-complexity` и `reproduce`.
-4. MCP-методы из раздела 5, по одному PR, начиная с `engineering_open_pr` и `engineering_verify`: они встречаются во всех трёх плейбуках.
+1. Роли в `library/step-types.json` (define-use-case, root-cause) и уровни по разделу 3.
+2. Правило «роль поверх уровня» в `playbook-executor.js` + opencode-профиль `research` на Gemini. Тот же профиль — для `hermes_research`.
+3. Шаг `review` в библиотеке и во всех трёх плейбуках.
+4. Условный уровень: `task_item_update(minimum_model_level)` плюс инструкции в `requirements-complexity` и `reproduce`.
+5. MCP-методы из раздела 5, по одному PR, начиная с `engineering_open_pr` и `engineering_verify`.
