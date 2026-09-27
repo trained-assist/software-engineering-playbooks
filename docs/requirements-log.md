@@ -61,6 +61,14 @@ itself was judged genuinely earned complexity and is untouched.
 - [реализовано] Optional host override of workspace/mirror roots via
   `ENGINEERING_WORKSPACE_ROOT` / `ENGINEERING_MIRRORS_ROOT` (defaults to `~/agent-data/...`); needed
   so tests stay hermetic, and lets a host place workspaces outside the default home.
+- [реализовано] Resume after the base branch moved (2026-09-27): a repeat
+  `engineering_spawn_workspace` with the same `root_task_id` returns the existing `code_ready`
+  workspace before refreshing the mirror. Before, the re-resolved `baseRevision` changed the
+  operation fingerprint and a legitimate resume failed with `CONFLICT` ("idempotency key was
+  already used with incompatible arguments") — seen on the VM, 1 of 11 real calls on 2026-09-27.
+- [планируется] The operation key is the bare `root_task_id`, global across principals and
+  repositories: the same label for a different repo/profile gets `CONFLICT` (safe, never another
+  task's workspace, but blocks the call). Not hit on the VM so far.
 
 ## Repository indexer v1 + engineering_repo_context + QA logs (issue #11)
 

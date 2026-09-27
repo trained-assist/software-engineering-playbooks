@@ -77,6 +77,33 @@ test('second call with the same rootTaskId reuses the same workspace (session re
   assert.equal(second.reused, true);
 });
 
+// Seen on the VM: the first spawn at 06:04, main moved, the resume at 07:19
+// failed with "idempotency key was already used with incompatible arguments".
+test('resume still reuses the workspace after the default branch moved on the remote', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'fix-forum-topics', workspaceRoot, mirrorsRoot };
+
+  const first = spawnWorkspaceForTask(opts);
+
+  const work = tmp('eng-remote-advance-');
+  runGit(work, ['clone', '-q', repositoryUrl, '.']);
+  runGit(work, ['config', 'user.email', 'test@example.com']);
+  runGit(work, ['config', 'user.name', 'Test']);
+  fs.writeFileSync(path.join(work, 'CHANGELOG.md'), 'moved\n');
+  runGit(work, ['add', '.']);
+  runGit(work, ['commit', '-qm', 'advance main']);
+  runGit(work, ['push', '-q', 'origin', 'HEAD:main']);
+
+  const second = spawnWorkspaceForTask(opts);
+
+  assert.equal(second.status, 'code_ready');
+  assert.equal(second.reused, true);
+  assert.equal(second.workspaceId, first.workspaceId);
+  assert.equal(second.codePath, first.codePath);
+  assert.equal(second.baseRevision, first.baseRevision);
+});
+
 test('a branch already occupying the target name is an explicit collision, not a silent takeover', () => {
   const repositoryUrl = makeRemote();
   const { workspaceRoot, mirrorsRoot } = env();

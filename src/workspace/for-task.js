@@ -23,7 +23,7 @@ const os = require('os');
 const path = require('path');
 const git = require('./git');
 const { fail } = require('./errors');
-const { spawnWorkspace, statusWorkspace, releaseWorkspace, ownerKeyOf, workspaceIdOf } = require('./workspace');
+const { spawnWorkspace, statusWorkspace, releaseWorkspace, ownerKeyOf, workspaceIdOf, CODE_READY } = require('./workspace');
 
 const DEFAULT_WORKSPACE_ROOT = path.join(os.homedir(), 'agent-data', 'engineering-workspaces');
 const DEFAULT_MIRRORS_ROOT = path.join(os.homedir(), 'agent-data', 'engineering-mirrors');
@@ -69,6 +69,17 @@ function spawnWorkspaceForTask({
   workspaceRoot = DEFAULT_WORKSPACE_ROOT, mirrorsRoot = DEFAULT_MIRRORS_ROOT, hostId,
 } = {}) {
   requireTaskFields({ principal, repositoryUrl, rootTaskId });
+
+  // Resume: a task that already has a ready workspace gets it back as-is,
+  // before the mirror is refreshed. The base branch has usually moved since
+  // the first spawn, and a re-resolved baseRevision changes the operation
+  // fingerprint — spawnWorkspace() would then reject a legitimate resume as
+  // "idempotency key was already used with incompatible arguments".
+  if (fs.existsSync(workspaceRoot)) {
+    const workspaceId = taskWorkspaceId({ principal, repositoryUrl, repositoryId, rootTaskId });
+    const existing = statusWorkspace({ workspaceRoot, workspaceId, principal, rootTaskId });
+    if (existing.found && existing.status === CODE_READY) return { ...existing, reused: true, recovered: false };
+  }
 
   const sourceCheckout = ensureMirror(repositoryUrl, mirrorsRoot);
   const baseRevision = resolveBaseRevision(sourceCheckout, ref);
