@@ -70,6 +70,20 @@ itself was judged genuinely earned complexity and is untouched.
   repositories: the same label for a different repo/profile gets `CONFLICT` (safe, never another
   task's workspace, but blocks the call). Not hit on the VM so far.
 
+## Engineering tools moved from trained-assist-agent core (trained-assist-agent#1631, 2026-09-27)
+
+- [реализовано] `60-github` (github_*), `61-dev` (dev_workspace_setup / dev_new_repo /
+  dev_supersede_pr), `63-ci-cd` (cicd_track_pr) served by this repo's `engineering-skills` MCP
+  server; core deletes its copies. Tool names unchanged.
+- [реализовано] `dev_workspace_setup` calls `spawnWorkspaceForTask` in-repo — core's
+  `engineeringLibPath()` / `ENGINEERING_WORKSPACE_LIB` path into the sibling is gone.
+- [реализовано] Core couplings cut: `token-value.js` mirrored; git hooks copied to
+  `templates/githooks/`; `cicd_track_pr` only needs the `checklist.md` filename (the GTD
+  controller in core scans it).
+- [реализовано] Registry: auto-discovers `tools/*.js`, supports core-shaped modules
+  (`isReady`/`setupTools`), `listAllTools()` for core's headless transport, `SKILLS_RESOLVED` filter.
+- [реализовано] Prompt domains `engineering`, `github.setup` live in `src/prompt-domains/`.
+
 ## Repository indexer v1 + engineering_repo_context + QA logs (issue #11)
 
 - [реализовано] Deterministic index v1: `buildIndex()` writes `.engineering/index/`
