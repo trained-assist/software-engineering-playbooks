@@ -141,7 +141,7 @@ function mainWorkflow({ repo, autofix_ref, ci_workflow_name }) {
     '      original_branch: ${{ github.event.workflow_run.head_branch }}',
     '      run_id: ${{ github.event.workflow_run.id }}',
     '    secrets:',
-    '      openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}',
+    '      llm_ladder_token: ${{ secrets.LLM_LADDER_TOKEN }}',
     '      gh_token: ${{ secrets.AUTOFIX_PAT || github.token }}',
     '',
   ].join('\n');
@@ -281,7 +281,7 @@ function prBody({ repo, ref, ciName, files }) {
     `- Files: ${files.map((f) => `\`${f}\``).join(', ')}`,
     '',
     'This PR only adds workflow files. It does **not** create or change repository',
-    'secrets: `OPENROUTER_API_KEY` and `AUTOFIX_PAT` are referenced by name and must',
+    'secrets: `LLM_LADDER_TOKEN` (org-level in trained-assist) and `AUTOFIX_PAT` are referenced by name and must',
     'be provisioned separately (approval-gated slice 2b).',
     '',
   ].join('\n');
