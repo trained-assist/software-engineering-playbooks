@@ -144,3 +144,23 @@ Design: `docs/PR-AUTOFIX-SERVICE.md` §3. Additive; external write = a PR to the
 - [отклонено (non-goals slice 2b)] ZeroCreds credential binding and pushing `OPENROUTER_API_KEY` /
   `AUTOFIX_PAT` to repo Actions secrets, run-event lifecycle, notifications, `disable` removing the
   installed workflow.
+
+## Engineering playbooks feature / debugging / new-software (2026-09-27)
+
+- [реализовано] Три исполняемых плейбука: `feature` (самый частый), `debugging`, `new-software`
+  (Playbook Zero) — Playbook v1 JSON в `playbooks/`, резолвятся агентом из этого sibling-репо.
+- [реализовано] Типизированная библиотека шагов `library/step-types.json` (24 типа): контракт шага,
+  типичные под-шаги, DoD, лестницы V/R/S, флаги сложности ⚪🟢🟡🔴⚫, соответствие OpenSpec.
+  Правило: новый шаг — только на границе исполнителя / проверки / ожидания; остальное — под-шаги.
+- [реализовано] Сборка `scripts/build-playbooks.js` (источники → Playbook v1 + читаемые доки),
+  тест синхронизации, схемы (vendored `contracts/playbook.schema.json`) и инвариантов процесса
+  (песочница/воспроизведение до реализации, PR → CI → merge, в конце archive, проверка в реальности).
+- [реализовано] Дизайн-док: sandbox-driven development + сверка с OpenSpec / Spec Kit / Kiro-EARS /
+  Shape Up / ADR / Confidence Meter / TRAFFIC / SRE postmortem / Temporal.
+- [реализовано] Ожидания (CI, merge, деплой, креды, ответ пользователя, ошибка в логах, таймер) —
+  через durable wait движка (`trained-assist-agent`, `docs/specs/durable-wait-until.md`).
+- [реализовано] Prose-процедуры `implement-feature.md` / `fix-bug.md` заменены указателями на
+  исполняемые плейбуки (слайс D #1573); `prepare-task.md` / `connect-github.md` остаются процедурами.
+- [планируется] Сжатый индекс репозитория для мини-ресерча в `define-use-case`.
+- [планируется] Hermes-авторинг (`playbook_draft`) не знает про `wait` / `step_type`.
+- [планируется] Переименовать sibling-чекаут на VM под новое имя репозитория.
