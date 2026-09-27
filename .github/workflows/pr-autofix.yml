@@ -25,11 +25,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: trained-assist/pr-autofix/.github/workflows/autofix-callable.yml@v1.5.3
+    uses: trained-assist/pr-autofix/.github/workflows/autofix-callable.yml@v1.6.0
     with:
       pr_number: ${{ github.event.workflow_run.pull_requests[0].number }}
       original_branch: ${{ github.event.workflow_run.head_branch }}
       run_id: ${{ github.event.workflow_run.id }}
     secrets:
-      openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+      llm_ladder_token: ${{ secrets.LLM_LADDER_TOKEN }}
       gh_token: ${{ secrets.AUTOFIX_PAT || github.token }}
