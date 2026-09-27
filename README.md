@@ -1,8 +1,46 @@
-# trained-assist-engineering
+# software-engineering-playbooks
+
+*(formerly `trained-assist-engineering`; the VM checkout still uses the old name)*
 
 Reusable software-engineering control plane for the `trained-assist` ecosystem.
 
 This repository exists to make coding agents **faster, safer and easier to coordinate** across many repositories and many concurrent tasks.
+
+## Engineering playbooks — `feature`, `debugging`, `new-software`
+
+Three executable processes the agent runs as durable plans (sandbox-driven development:
+first an executable loop that reproduces the user scenario, then the code that passes it).
+
+| Playbook | When | Readable version |
+|---|---|---|
+| `feature` | most common: a feature or change in an existing product | [docs/playbooks/feature.md](docs/playbooks/feature.md) |
+| `debugging` | a bug, regression or error in the logs | [docs/playbooks/debugging.md](docs/playbooks/debugging.md) |
+| `new-software` | a new module/service from scratch (Playbook Zero) | [docs/playbooks/new-software.md](docs/playbooks/new-software.md) |
+
+- **Design, industry mapping (OpenSpec, Spec Kit, Kiro/EARS, Shape Up, Temporal…), ladders and flags:**
+  [docs/engineering-playbooks-design-sandbox-driven-development-and-industry-mapping.md](docs/engineering-playbooks-design-sandbox-driven-development-and-industry-mapping.md)
+- **Typed step library** (24 step types, sub-steps, V/R/S ladders, ⚪🟢🟡🔴⚫ flags): `library/step-types.json` →
+  [docs/playbooks/step-library.md](docs/playbooks/step-library.md)
+
+How it fits together:
+
+```text
+library/step-types.json  +  playbooks-src/<id>.json
+        │  npm run build:playbooks        (tests fail if the output is stale)
+        ▼
+playbooks/<id>.json  — Playbook v1 (contracts/playbook.schema.json, vendored from trained-assist-agent)
+        │  trained-assist-agent PlaybookStore resolves it from this sibling checkout
+        ▼
+playbook_run(playbook_id, goal, vars: {repo}) → draft durable plan → task_update status=active
+        → the 5-minute tick runs each step on its model level, sleeps on waits
+          (CI, merge, deploy, credentials, user answer, error in logs, timer), wakes up, validates, finalizes
+```
+
+Editing a process: change the library (shared sub-steps) or the source (playbook-specific notes/overrides),
+run `npm run build:playbooks`, open a PR. Running plans are pinned to `playbook_id@version` — bump `version`
+when you change what a step means. The runtime contract (durable waits, validators) lives in
+`trained-assist-agent` (`docs/specs/durable-wait-until.md`); `contracts/playbook.schema.json` here is a copy
+of that repo's schema — keep them in sync.
 
 It is intentionally separate from product/runtime repositories such as `trained-assist-agent`, `trained-assist-web`, and future domain repositories.
 
@@ -792,9 +830,11 @@ src/
     registry.js         # per-profile pr-autofix registration store + state machine
   mcp-skills/
 
-contracts/
-playbooks/
-docs/
+contracts/              # incl. playbook.schema.json (vendored Playbook v1)
+library/                # step-types.json — typed step library (sub-steps, ladders, flags)
+playbooks-src/          # feature / debugging / new-software sources
+playbooks/              # built Playbook v1 JSON (+ prose procedures prepare-task, connect-github)
+docs/                   # docs/playbooks/*.md — generated readable playbooks
 examples/
 scripts/                # index-repo.js, manifest-check.js
 ```

@@ -1,9 +1,6 @@
-# Playbook: fix bug
+# Playbook: fix bug → superseded
 
-1. Capture a reproducible failing scenario when possible.
-2. Run `prepare_task` against the failure description.
-3. Identify the narrowest code path and related tests.
-4. Add/preserve a regression check.
-5. Implement the smallest valid fix.
-6. Run fast affected verification, then required full verification.
-7. Submit evidence: reproduction before, verification after.
+Replaced by the executable `debugging` playbook: `playbooks/debugging.json`
+(readable: `docs/playbooks/debugging.md`). Reproduction-first, regression test
+from the reproduction and confirmation in production are now typed steps
+(`reproduce`, `root-cause`, `implement`, `confirm-fixed`).
