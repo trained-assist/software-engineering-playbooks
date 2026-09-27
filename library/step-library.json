@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "description": "Каталог типов шагов инженерных плейбуков. step_type шага должен быть здесь, а его контракт — совпадать. См. docs/engineering-playbooks-methodology-sandbox-first.md",
+  "step_types": {
+    "approaches": {
+      "summary": "Сгенерировать и ранжировать подходы по достижимому S",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "archive": {
+      "summary": "Обновить user stories и requirements-log, закрыть issue, сжать журнал",
+      "execution_kind": "agent",
+      "executor_role": "researcher",
+      "waits": false
+    },
+    "complexity-review": {
+      "summary": "Флаги сложности требований green/yellow/red/black, челлендж red",
+      "execution_kind": "agent",
+      "executor_role": "reviewer",
+      "waits": false
+    },
+    "declare-plan": {
+      "summary": "GitHub issue + объявление проб в журнале",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "environment": {
+      "summary": "Инвентаризация среды и меню доступов A0–A4",
+      "execution_kind": "agent",
+      "executor_role": "researcher",
+      "waits": false
+    },
+    "explore": {
+      "summary": "Исследование: сначала внутри репо, потом снаружи",
+      "execution_kind": "agent",
+      "executor_role": "researcher",
+      "waits": false
+    },
+    "feedback-level": {
+      "summary": "Текущий и целевой S-уровень обратной связи, что нужно для S5",
+      "execution_kind": "agent",
+      "executor_role": "researcher",
+      "waits": false
+    },
+    "implement": {
+      "summary": "Реализация по слайсам до зелёного",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "intake": {
+      "summary": "User story: ценность (V0–V5), шаги с привязкой к UI/API/CLI, Given/When/Then",
+      "execution_kind": "agent",
+      "executor_role": "researcher",
+      "waits": false
+    },
+    "intake-bug": {
+      "summary": "Симптом, ожидание vs факт, уровень воспроизведения L0–L5",
+      "execution_kind": "agent",
+      "executor_role": "researcher",
+      "waits": false
+    },
+    "open-pr": {
+      "summary": "Открыть PR, полный URL в журнал",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "propose": {
+      "summary": "Proposal + design + Tasks (слайсы)",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "reproduce": {
+      "summary": "Воспроизвести баг, поднять L до максимума или объявить захват",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "root-cause": {
+      "summary": "Первопричина с доказательствами",
+      "execution_kind": "agent",
+      "executor_role": "researcher",
+      "waits": false
+    },
+    "sandbox": {
+      "summary": "Песочница: сценарий гоняется без человека, сейчас красный",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "sandbox-to-real": {
+      "summary": "Перенос из песочницы в реальную среду",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "spike": {
+      "summary": "Одноразовый прототип самого рискованного допущения",
+      "execution_kind": "agent",
+      "executor_role": "developer",
+      "waits": false
+    },
+    "verify-live": {
+      "summary": "Шаги user story в реальной среде с evidence",
+      "execution_kind": "agent",
+      "executor_role": "verifier",
+      "waits": false
+    },
+    "verify-local": {
+      "summary": "Гейт без модели: проба tests",
+      "execution_kind": "programmatic",
+      "waits": false
+    },
+    "verify-sandbox": {
+      "summary": "Гейт без модели: проба scenario_e2e",
+      "execution_kind": "programmatic",
+      "waits": false
+    },
+    "wait-capture": {
+      "summary": "Ожидание без модели: ошибка снова появилась (проба error_captured)",
+      "execution_kind": "programmatic",
+      "waits": true
+    },
+    "wait-ci": {
+      "summary": "Ожидание без модели: CI зелёный",
+      "execution_kind": "programmatic",
+      "waits": true
+    },
+    "wait-deploy": {
+      "summary": "Ожидание без модели: проба deploy_live",
+      "execution_kind": "programmatic",
+      "waits": true
+    },
+    "wait-error-gone": {
+      "summary": "Ожидание без модели: ошибка ушла из логов (проба error_gone)",
+      "execution_kind": "programmatic",
+      "waits": true
+    },
+    "wait-merge": {
+      "summary": "Ожидание без модели: PR смёржен",
+      "execution_kind": "programmatic",
+      "waits": true
+    }
+  }
+}

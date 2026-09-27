@@ -1,0 +1,265 @@
+{
+  "id": "feature",
+  "version": 1,
+  "scope": "system",
+  "title": "Фича или изменение",
+  "goal_template": "{goal}",
+  "user_value_template": "Пользователь получает ценность «{goal}» — проверено вживую, с актуальным evidence.",
+  "defaults": {
+    "max_attempts": 3,
+    "execution_timeout_seconds": 900,
+    "recovery_policy": "default"
+  },
+  "stages": [
+    {
+      "id": "frame",
+      "title": "Сценарий и ценность",
+      "steps": [
+        {
+          "title": "Сценарий пользователя и ценность",
+          "step_type": "intake",
+          "execution_kind": "agent",
+          "executor_role": "researcher",
+          "minimum_model_level": "bachelor",
+          "context_budget": "small",
+          "validation": {
+            "user_story_with_value_and_steps": true
+          },
+          "instructions": "Definition of Done шага: описаны ЦЕННОСТЬ и ШАГИ. 1) Прочитай раздел Intake в журнале (его пишет чат-агент до активации из диалога с юзером). 2) До вопросов юзеру поищи в репозитории существующую историю: docs/user-stories*, docs/user-scenarios/**, README — если история описана, дополни её, а не пиши заново. 3) Ценность — результатом для пользователя, может быть негативной («хакер не получил кредов», «free-юзер не смог вызвать платную фичу»). 4) Уровень доказанности ценности (V): V5 — за это уже платят / есть запрос платящего клиента; V4 — много пользователей, CustDev-документ или поисковый спрос; V3 — отзывы, фича-реквесты; V2 — оценка sales/маркетолога, общающегося с клиентами (норм для средней фичи); V1 — оценка инженера (норм для мелкой); V0 — не указано (норм только для нестрогих задач). Если уровень ниже нужного для масштаба фичи — явно запиши риск («система может понять задачу неправильно»). 5) Шаги — хронологическое взаимодействие с сервисом до успеха, каждый шаг привязан к конкретному блоку UI / API-эндпоинту / CLI-команде. 6) Критерии приёмки в формате Given/When/Then — из них потом строятся тесты и проверка вживую. 7) Запиши в журнал раздел «User story» (ценность, V-уровень, шаги, Given/When/Then). Если без человека дальше нельзя — запиши вопрос(ы) в журнал и заверши шаг строкой `DURABLE: failed: BLOCKED-ON-USER: <конкретный вопрос>`. Не пытай юзера анкетой: спрашивай только то, чего нельзя вывести из репозитория и журнала, и предлагай свой вариант ответа.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "explore",
+      "title": "Исследование и сложность",
+      "steps": [
+        {
+          "title": "Исследование: сначала внутри, потом снаружи",
+          "step_type": "explore",
+          "execution_kind": "agent",
+          "executor_role": "researcher",
+          "minimum_model_level": "bachelor",
+          "context_budget": "medium",
+          "validation": {
+            "exploration_recorded": true
+          },
+          "instructions": "Цель: понять, где в системе живёт этот сценарий и что уже есть. 1) Внутри: карта затронутых модулей, похожий код, что можно переиспользовать, тесты рядом, недавние коммиты/PR по теме (engineering_repo_context / prepare_task, если доступны; иначе grep и git log). 2) Снаружи — только если внутри решения нет: как это сделано у других (библиотеки, сервисы, OSS, документация), с ссылками. 3) Запиши в журнал раздел «Explore»: найденное, ссылки на файлы:строки, кандидаты на переиспользование, открытые вопросы.",
+          "execution_timeout_seconds": 900
+        },
+        {
+          "title": "Флаги сложности требований",
+          "step_type": "complexity-review",
+          "execution_kind": "agent",
+          "executor_role": "reviewer",
+          "minimum_model_level": "master",
+          "context_budget": "small",
+          "validation": {
+            "requirements_flagged": true
+          },
+          "instructions": "Флаги сложности требований: 🟢 green — не меняет модель системы (текст, цвет, поле в существующем ответе); 🟡 yellow — новая сущность, интеграция, платформа или миграция данных, умеренно растит матрицу тестов; 🔴 red — права доступа/роли/группы пользователей, мультитенантность, деньги, безопасность, необратимые данные: плодят состояния по всей системе — ОБЯЗАТЕЛЬНО челленджить (нужно ли? что если без этого? что проще даёт ту же ценность?); ⚫ black — неоднозначность: пересекающиеся или противоречивые сценарии, одно действие ведёт себя по-разному — строить нельзя, пока не разрешено. 1) Выпиши каждое требование и поставь флаг. 2) Для каждого 🔴 — вариант без него или проще, цена в тестах/состояниях, и рекомендация. 3) Требование «уже так написано в коде» — не требование: если существующий код сложнее задачи, меняем код, а не тащим сложность в план. 4) Если есть ⚫ или 🔴 без явного согласия юзера — Если без человека дальше нельзя — запиши вопрос(ы) в журнал и заверши шаг строкой `DURABLE: failed: BLOCKED-ON-USER: <конкретный вопрос>`. Не пытай юзера анкетой: спрашивай только то, чего нельзя вывести из репозитория и журнала, и предлагай свой вариант ответа. 5) Запиши в журнал таблицу «Требования и флаги».",
+          "execution_timeout_seconds": 900
+        },
+        {
+          "title": "Уровень обратной связи (S0–S5) и что нужно для S5",
+          "step_type": "feedback-level",
+          "execution_kind": "agent",
+          "executor_role": "researcher",
+          "minimum_model_level": "master",
+          "context_budget": "medium",
+          "validation": {
+            "feedback_level_recorded": true
+          },
+          "instructions": "Лестница обратной связи (S) — насколько агент сам может прогнать сценарий и увидеть результат: S5 — замкнутая песочница: агент без человека воспроизводит сценарий end-to-end (локально/staging/эмулятор) за минуты и сколько угодно раз; S4 — эффект наблюдаем в реальной среде (логи/метрики/API), но вызвать его сам агент не может; S3 — есть чёткие шаги, но прогон требует человека; S2 — есть конкретный сигнал без среды (текст ошибки, стек, контракт API); S1 — есть факт с привязкой ко времени и модулю; S0 — только со слов. Скорость агента = скорость его цикла «изменил → увидел результат», поэтому сначала поднимаем этот уровень, потом пишем код. 1) Определи текущий S-уровень для этой фичи. 2) Определи достижимый: что агент может поднять сам (локальный запуск, фикстуры, моки, эмулятор, staging), каких доступов/ключей не хватает и какой уровень доступа реально просить у юзера. 3) Оцени задачу для юзера по уровню: S5 — «выглядит несложно, делаю»; S3 и ниже — предупреди о стоимости и риске. 4) Запиши в журнал раздел «Feedback loop»: текущий S, целевой S, план подъёма, недостающие доступы. Если без человека дальше нельзя — запиши вопрос(ы) в журнал и заверши шаг строкой `DURABLE: failed: BLOCKED-ON-USER: <конкретный вопрос>`. Не пытай юзера анкетой: спрашивай только то, чего нельзя вывести из репозитория и журнала, и предлагай свой вариант ответа.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "propose",
+      "title": "Предложение и план",
+      "steps": [
+        {
+          "title": "Подходы → выбрать минимальное изменение",
+          "step_type": "propose",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "master",
+          "context_budget": "medium",
+          "validation": {
+            "proposal_with_tasks": true
+          },
+          "instructions": "Аналог OpenSpec propose. 1) 1–3 подхода, ранжируй: минимальный объём изменения, достижимый S-уровень проверки, риск, обратимость (двусторонняя дверь лучше односторонней). 2) Выбери один и обоснуй. 3) Design: какие модули/контракты меняются, миграции, обратная совместимость, откат. 4) Tasks: слайсы, каждый — одно проверяемое изменение, помещающееся в один запуск агента, с тестом. 5) Запиши в журнал «Proposal», «Design», «Tasks» (чек-лист).",
+          "execution_timeout_seconds": 900
+        },
+        {
+          "title": "Объявить план: GitHub issue + пробы",
+          "step_type": "declare-plan",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "bachelor",
+          "context_budget": "small",
+          "validation": {
+            "probes_declared": [
+              "tests",
+              "deploy_live"
+            ],
+            "plan_issue_linked": true
+          },
+          "instructions": "Это «бумаги учёного»: если процесс умрёт, по ним другой агент или человек доведёт работу. 1) Создай (или обнови найденную) GitHub issue в целевом репозитории: user story, флаги, S-уровень, выбранный подход, чек-лист слайсов, ссылка на журнал. Полный URL issue запиши в журнал. 2) Пробы — конкретные проверки этого запуска, которые потом выполняются без модели (в т.ч. в шагах-ожиданиях). Объяви их отдельными строками в журнале, точно в формате: `PROBE <имя>: http_ok <url> [contains <текст>]` | `PROBE <имя>: command <shell-команда, exit 0 = ок>` | `PROBE <имя>: skip <почему не применимо>`. Команда выполняется в каталоге проекта профиля — используй абсолютные пути (`cd /abs/repo && …`). Последнее объявление пробы побеждает. Обязательно объяви: tests, deploy_live. 3) Если чего-то нет (нет деплоя, нет staging) — объяви пробу как `skip <почему>`, а не пропускай.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "sandbox",
+      "title": "Песочница",
+      "steps": [
+        {
+          "title": "Песочница: приёмочная проверка красная до изменения",
+          "step_type": "sandbox",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "master",
+          "context_budget": "medium",
+          "validation": {
+            "acceptance_check_red_before_change": true
+          },
+          "instructions": "Sandbox-first: прежде кода — проверка, которая прогоняет шаги user story и сейчас падает. 1) Подними S-уровень до целевого из «Feedback loop»: фикстуры, моки внешних сервисов, локальный запуск, staging. 2) Напиши приёмочный тест/скрипт по Given/When/Then; убедись, что он КРАСНЫЙ по правильной причине. 3) Запиши в журнал команду запуска и достигнутый S-уровень; при необходимости переобъяви `PROBE tests`.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "apply",
+      "title": "Реализация",
+      "steps": [
+        {
+          "title": "Реализовать по слайсам",
+          "step_type": "implement",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "master",
+          "context_budget": "large",
+          "validation": {
+            "acceptance_check_green": true,
+            "slices_done": true
+          },
+          "instructions": "Git: только своя свежая ветка от origin/main (`feat|fix/<slug>-<unixts>`) в отдельном workspace/worktree (engineering_spawn_workspace, если доступен) — никогда не чужая ветка и не общий checkout; PR неизменяем: фикс после открытия PR — новая ветка и новый PR с пометкой supersedes. 1) Иди по чек-листу Tasks из журнала слайс за слайсом; можно несколько слайсов за один запуск, отмечай каждый в журнале. 2) После каждого слайса — быстрые затронутые тесты; в конце — приёмочная проверка ЗЕЛЁНАЯ и полный `check`/`test`. 3) Коммить до запуска кода; сообщения коммитов по делу. 4) Не расширяй скоуп: всё новое — в журнал как follow-up.",
+          "execution_timeout_seconds": 2400
+        },
+        {
+          "title": "Гейт: тесты и линт",
+          "step_type": "verify-local",
+          "execution_kind": "programmatic",
+          "validation": {
+            "probe": "tests"
+          },
+          "instructions": "Без модели: проба tests из журнала (обычно `cd <repo> && npm run check && npm test`). Упала — план остановится; почини в новом коммите и продолжи через task_item_resume.",
+          "max_attempts": 2
+        },
+        {
+          "title": "Открыть PR",
+          "step_type": "open-pr",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "bachelor",
+          "context_budget": "small",
+          "validation": {
+            "pr_opened": true
+          },
+          "instructions": "Git: только своя свежая ветка от origin/main (`feat|fix/<slug>-<unixts>`) в отдельном workspace/worktree (engineering_spawn_workspace, если доступен) — никогда не чужая ветка и не общий checkout; PR неизменяем: фикс после открытия PR — новая ветка и новый PR с пометкой supersedes. 1) Запушь свою ветку, `gh pr create` с описанием: что/зачем/как проверено, `Closes #<issue>`. 2) Запиши полный URL PR в журнал (по нему следующие шаги ждут CI и merge) и прокомментируй issue ссылкой на PR.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "deliver",
+      "title": "Доставка и проверка",
+      "steps": [
+        {
+          "title": "Ждать зелёный CI",
+          "step_type": "wait-ci",
+          "execution_kind": "programmatic",
+          "validation": {
+            "ci_green": true
+          },
+          "instructions": "Без модели: опрос check-runs PR из журнала. Красный CI чинит autofix/CI-фиксер; если к таймауту не зелёный — план остановится и владелец получит уведомление.",
+          "wait": {
+            "poll_sec": 300,
+            "timeout_sec": 10800
+          }
+        },
+        {
+          "title": "Ждать merge PR",
+          "step_type": "wait-merge",
+          "execution_kind": "programmatic",
+          "validation": {
+            "merged": true
+          },
+          "instructions": "Без модели: ждём merge (авто-merge на зелёном CI или ручной merge юзером — до 3 дней).",
+          "wait": {
+            "poll_sec": 600,
+            "timeout_sec": 259200
+          }
+        },
+        {
+          "title": "Ждать деплой",
+          "step_type": "wait-deploy",
+          "execution_kind": "programmatic",
+          "validation": {
+            "probe": "deploy_live"
+          },
+          "instructions": "Без модели: проба deploy_live из журнала (например /health отдаёт commit merge-коммита).",
+          "wait": {
+            "poll_sec": 300,
+            "timeout_sec": 7200
+          }
+        },
+        {
+          "title": "Проверить сценарий вживую",
+          "step_type": "verify-live",
+          "execution_kind": "agent",
+          "executor_role": "verifier",
+          "minimum_model_level": "master",
+          "context_budget": "medium",
+          "validation": {
+            "user_scenario_verified_live": true
+          },
+          "instructions": "1) Пройди шаги user story этой фичи в реальной среде на максимально доступном S-уровне (API/CLI/браузер/логи). 2) Сверь каждый Given/When/Then; приложи evidence в журнал (команды, ответы, скриншоты, ссылки на логи). 3) Не совпало — опиши расхождение и заверши шаг как failed (не подгоняй критерии под результат).",
+          "execution_timeout_seconds": 900
+        },
+        {
+          "title": "Архив: истина о поведении + сжатие журнала",
+          "step_type": "archive",
+          "execution_kind": "agent",
+          "executor_role": "researcher",
+          "minimum_model_level": "bachelor",
+          "context_budget": "medium",
+          "validation": {
+            "docs_updated": true,
+            "issue_closed_with_evidence": true
+          },
+          "instructions": "Аналог OpenSpec archive: поведение, которое теперь есть в системе, становится источником истины. 1) Обнови файл user stories репозитория (добавь/исправь историю по факту). 2) Обнови docs/requirements-log.md (статус реализовано/отклонено-почему). 3) 4) Закрой issue комментарием с evidence (PR, проверка вживую). 5) Сожми журнал в краткий итог (решения, грабли, ссылки) — в конец журнала раздел «Итог»; дешёвой моделью, без пересказа всего подряд.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    }
+  ],
+  "hooks": {
+    "task_done": [
+      {
+        "type": "notify",
+        "to": "owner",
+        "text": "✅ Готово и проверено вживую: {goal}"
+      }
+    ],
+    "task_failed": [
+      {
+        "type": "notify",
+        "to": "owner",
+        "text": "⚠️ План остановился: {goal} — {error}"
+      }
+    ]
+  }
+}

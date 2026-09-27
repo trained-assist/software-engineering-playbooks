@@ -1,0 +1,272 @@
+{
+  "id": "debugging",
+  "version": 1,
+  "scope": "system",
+  "title": "Дебаггинг",
+  "goal_template": "Баг: {goal}",
+  "user_value_template": "Сценарий снова работает для пользователя: {goal}; ошибка не возвращается, есть регрессионный тест.",
+  "defaults": {
+    "max_attempts": 3,
+    "execution_timeout_seconds": 900,
+    "recovery_policy": "default"
+  },
+  "stages": [
+    {
+      "id": "frame",
+      "title": "Симптом и уровень воспроизведения",
+      "steps": [
+        {
+          "title": "Симптом, ожидание и уровень воспроизведения",
+          "step_type": "intake-bug",
+          "execution_kind": "agent",
+          "executor_role": "researcher",
+          "minimum_model_level": "bachelor",
+          "context_budget": "small",
+          "validation": {
+            "symptom_expected_and_level_recorded": true
+          },
+          "instructions": "1) Прочитай Intake в журнале. 2) Запиши: кто пострадал и какую ценность потерял; ожидаемое vs фактическое поведение; когда началось; частота. 3) Лестница воспроизведения бага (L = та же S-лестница для багов): L5 — повторяется по требованию (staging/локально/тест); L4 — видна в логах, но вызвать её не можем; L3 — чёткий репорт шагов от юзера; L2 — есть недефолтный текст ошибки / exception; L1 — факт ошибки с привязкой ко времени и модулю; L0 — со слов. Поставь текущий L-уровень с обоснованием. 4) Найди user story сценария в репозитории — баг это отклонение от неё. 5) Запиши в журнал раздел «Bug». Если без человека дальше нельзя — запиши вопрос(ы) в журнал и заверши шаг строкой `DURABLE: failed: BLOCKED-ON-USER: <конкретный вопрос>`. Не пытай юзера анкетой: спрашивай только то, чего нельзя вывести из репозитория и журнала, и предлагай свой вариант ответа.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "reproduce",
+      "title": "Контекст и воспроизведение",
+      "steps": [
+        {
+          "title": "Исследование: сначала внутри, потом снаружи",
+          "step_type": "explore",
+          "execution_kind": "agent",
+          "executor_role": "researcher",
+          "minimum_model_level": "bachelor",
+          "context_budget": "medium",
+          "validation": {
+            "exploration_recorded": true
+          },
+          "instructions": "Цель: собрать контекст бага: логи вокруг времени ошибки, деплои и коммиты перед началом, код по стеку, похожие прошлые issues. 1) Внутри: карта затронутых модулей, похожий код, что можно переиспользовать, тесты рядом, недавние коммиты/PR по теме (engineering_repo_context / prepare_task, если доступны; иначе grep и git log). 2) Снаружи — только если внутри решения нет: как это сделано у других (библиотеки, сервисы, OSS, документация), с ссылками. 3) Запиши в журнал раздел «Explore»: найденное, ссылки на файлы:строки, кандидаты на переиспользование, открытые вопросы.",
+          "execution_timeout_seconds": 900
+        },
+        {
+          "title": "Воспроизвести: поднять L-уровень до максимума",
+          "step_type": "reproduce",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "master",
+          "context_budget": "medium",
+          "validation": {
+            "reproduction_or_capture_declared": true
+          },
+          "instructions": "Цель — L5: падающий тест или скрипт, повторяющий баг по требованию. 1) Попробуй воспроизвести локально/на staging по шагам и стеку; удалось — зафиксируй падающий тест и команду в журнале, объяви `PROBE error_captured: skip воспроизведено тестом <путь>`. 2) Не удалось, но ошибка видна в логах (L4) — объяви `PROBE error_captured: command …`, которая выходит с 0, когда в логах появилось НОВОЕ вхождение после текущего момента (например, сравнивает счётчик/последний timestamp с записанным в файл), и опиши в журнале, что снять при следующем вхождении. 3) Пробы — конкретные проверки этого запуска, которые потом выполняются без модели (в т.ч. в шагах-ожиданиях). Объяви их отдельными строками в журнале, точно в формате: `PROBE <имя>: http_ok <url> [contains <текст>]` | `PROBE <имя>: command <shell-команда, exit 0 = ок>` | `PROBE <имя>: skip <почему не применимо>`. Команда выполняется в каталоге проекта профиля — используй абсолютные пути (`cd /abs/repo && …`). Последнее объявление пробы побеждает.",
+          "execution_timeout_seconds": 900
+        },
+        {
+          "title": "Ждать повторения ошибки (если не воспроизвели)",
+          "step_type": "wait-capture",
+          "execution_kind": "programmatic",
+          "validation": {
+            "probe": "error_captured"
+          },
+          "instructions": "Без модели: процесс спит, пока ошибка снова не появится в логах (или сразу проходит, если проба skip). До 3 дней.",
+          "wait": {
+            "poll_sec": 600,
+            "timeout_sec": 259200
+          }
+        },
+        {
+          "title": "Первопричина",
+          "step_type": "root-cause",
+          "execution_kind": "agent",
+          "executor_role": "researcher",
+          "minimum_model_level": "master",
+          "context_budget": "medium",
+          "validation": {
+            "root_cause_identified": true
+          },
+          "instructions": "1) Если было ожидание — изучи свежее вхождение (логи, данные, стек). 2) Гипотеза → проверка воспроизведением; «5 почему» до настоящей причины, а не симптома. 3) Укажи точное место (файл:строка) и почему это не поймали тесты. 4) Запиши в журнал «Root cause» с доказательствами.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "propose",
+      "title": "План фикса",
+      "steps": [
+        {
+          "title": "Минимальный фикс + регрессионный тест",
+          "step_type": "propose",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "master",
+          "context_budget": "medium",
+          "validation": {
+            "fix_proposal_recorded": true
+          },
+          "instructions": "1) Минимальный фикс первопричины (не симптома) и регрессионный тест, который сейчас красный. 2) Риски и откат. 3) Фикс не должен добавлять 🔴-сложность: Флаги сложности требований: 🟢 green — не меняет модель системы (текст, цвет, поле в существующем ответе); 🟡 yellow — новая сущность, интеграция, платформа или миграция данных, умеренно растит матрицу тестов; 🔴 red — права доступа/роли/группы пользователей, мультитенантность, деньги, безопасность, необратимые данные: плодят состояния по всей системе — ОБЯЗАТЕЛЬНО челленджить (нужно ли? что если без этого? что проще даёт ту же ценность?); ⚫ black — неоднозначность: пересекающиеся или противоречивые сценарии, одно действие ведёт себя по-разному — строить нельзя, пока не разрешено. 4) Нужна ли защита на будущее (алерт/валидация/лог). 5) Запиши в журнал «Fix plan».",
+          "execution_timeout_seconds": 900
+        },
+        {
+          "title": "Объявить план: GitHub issue + пробы",
+          "step_type": "declare-plan",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "bachelor",
+          "context_budget": "small",
+          "validation": {
+            "probes_declared": [
+              "tests",
+              "deploy_live",
+              "error_gone"
+            ],
+            "plan_issue_linked": true
+          },
+          "instructions": "Это «бумаги учёного»: если процесс умрёт, по ним другой агент или человек доведёт работу. 1) Создай (или обнови найденную) GitHub issue в целевом репозитории: user story, флаги, S-уровень, выбранный подход, чек-лист слайсов, ссылка на журнал. Полный URL issue запиши в журнал. 2) Пробы — конкретные проверки этого запуска, которые потом выполняются без модели (в т.ч. в шагах-ожиданиях). Объяви их отдельными строками в журнале, точно в формате: `PROBE <имя>: http_ok <url> [contains <текст>]` | `PROBE <имя>: command <shell-команда, exit 0 = ок>` | `PROBE <имя>: skip <почему не применимо>`. Команда выполняется в каталоге проекта профиля — используй абсолютные пути (`cd /abs/repo && …`). Последнее объявление пробы побеждает. Обязательно объяви: tests, deploy_live, error_gone. Проба error_gone должна проверять, что в логах НЕТ новых вхождений после деплоя за окно не меньше типичного интервала между ошибками (например `! journalctl -u app --since '<время деплоя>' | grep -q '<сигнатура>'`); если окно по времени нельзя привязать к деплою — объясни в журнале. 3) Если чего-то нет (нет деплоя, нет staging) — объяви пробу как `skip <почему>`, а не пропускай.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "apply",
+      "title": "Фикс",
+      "steps": [
+        {
+          "title": "Фикс: регрессионный тест красный → зелёный",
+          "step_type": "implement",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "master",
+          "context_budget": "large",
+          "validation": {
+            "regression_test_red_then_green": true
+          },
+          "instructions": "Git: только своя свежая ветка от origin/main (`feat|fix/<slug>-<unixts>`) в отдельном workspace/worktree (engineering_spawn_workspace, если доступен) — никогда не чужая ветка и не общий checkout; PR неизменяем: фикс после открытия PR — новая ветка и новый PR с пометкой supersedes. 1) Сначала регрессионный тест, падающий на текущем коде (или тест из шага воспроизведения). 2) Минимальный фикс. 3) Тест зелёный + полный `check`/`test`. 4) Коммит до запуска. Запиши в журнал, что изменено.",
+          "execution_timeout_seconds": 2400
+        },
+        {
+          "title": "Гейт: тесты и линт",
+          "step_type": "verify-local",
+          "execution_kind": "programmatic",
+          "validation": {
+            "probe": "tests"
+          },
+          "instructions": "Без модели: проба tests из журнала (обычно `cd <repo> && npm run check && npm test`). Упала — план остановится; почини в новом коммите и продолжи через task_item_resume.",
+          "max_attempts": 2
+        },
+        {
+          "title": "Открыть PR",
+          "step_type": "open-pr",
+          "execution_kind": "agent",
+          "executor_role": "developer",
+          "minimum_model_level": "bachelor",
+          "context_budget": "small",
+          "validation": {
+            "pr_opened": true
+          },
+          "instructions": "Git: только своя свежая ветка от origin/main (`feat|fix/<slug>-<unixts>`) в отдельном workspace/worktree (engineering_spawn_workspace, если доступен) — никогда не чужая ветка и не общий checkout; PR неизменяем: фикс после открытия PR — новая ветка и новый PR с пометкой supersedes. 1) Запушь свою ветку, `gh pr create` с описанием: что/зачем/как проверено, `Closes #<issue>`. 2) Запиши полный URL PR в журнал (по нему следующие шаги ждут CI и merge) и прокомментируй issue ссылкой на PR.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    },
+    {
+      "id": "deliver",
+      "title": "Доставка и наблюдение",
+      "steps": [
+        {
+          "title": "Ждать зелёный CI",
+          "step_type": "wait-ci",
+          "execution_kind": "programmatic",
+          "validation": {
+            "ci_green": true
+          },
+          "instructions": "Без модели: опрос check-runs PR из журнала. Красный CI чинит autofix/CI-фиксер; если к таймауту не зелёный — план остановится и владелец получит уведомление.",
+          "wait": {
+            "poll_sec": 300,
+            "timeout_sec": 10800
+          }
+        },
+        {
+          "title": "Ждать merge PR",
+          "step_type": "wait-merge",
+          "execution_kind": "programmatic",
+          "validation": {
+            "merged": true
+          },
+          "instructions": "Без модели: ждём merge (авто-merge на зелёном CI или ручной merge юзером — до 3 дней).",
+          "wait": {
+            "poll_sec": 600,
+            "timeout_sec": 259200
+          }
+        },
+        {
+          "title": "Ждать деплой",
+          "step_type": "wait-deploy",
+          "execution_kind": "programmatic",
+          "validation": {
+            "probe": "deploy_live"
+          },
+          "instructions": "Без модели: проба deploy_live из журнала (например /health отдаёт commit merge-коммита).",
+          "wait": {
+            "poll_sec": 300,
+            "timeout_sec": 7200
+          }
+        },
+        {
+          "title": "Ждать, что ошибка ушла из логов",
+          "step_type": "wait-error-gone",
+          "execution_kind": "programmatic",
+          "validation": {
+            "probe": "error_gone"
+          },
+          "instructions": "Без модели: проба error_gone опрашивается, пока окно после деплоя не станет чистым (до суток).",
+          "wait": {
+            "poll_sec": 900,
+            "timeout_sec": 86400
+          }
+        },
+        {
+          "title": "Проверить сценарий вживую",
+          "step_type": "verify-live",
+          "execution_kind": "agent",
+          "executor_role": "verifier",
+          "minimum_model_level": "master",
+          "context_budget": "medium",
+          "validation": {
+            "user_scenario_verified_live": true
+          },
+          "instructions": "1) Пройди шаги user story из репорта бага (исходные шаги) в реальной среде на максимально доступном S-уровне (API/CLI/браузер/логи). 2) Сверь каждый Given/When/Then; приложи evidence в журнал (команды, ответы, скриншоты, ссылки на логи). 3) Не совпало — опиши расхождение и заверши шаг как failed (не подгоняй критерии под результат).",
+          "execution_timeout_seconds": 900
+        },
+        {
+          "title": "Архив: истина о поведении + сжатие журнала",
+          "step_type": "archive",
+          "execution_kind": "agent",
+          "executor_role": "researcher",
+          "minimum_model_level": "bachelor",
+          "context_budget": "medium",
+          "validation": {
+            "docs_updated": true,
+            "issue_closed_with_evidence": true
+          },
+          "instructions": "Аналог OpenSpec archive: поведение, которое теперь есть в системе, становится источником истины. 1) Обнови файл user stories репозитория (добавь/исправь историю по факту). 2) Обнови docs/requirements-log.md (статус реализовано/отклонено-почему). 3) Мини-постмортем в issue/журнале: причина, фикс, почему не поймали раньше, какая защита добавлена. 4) Закрой issue комментарием с evidence (PR, проверка вживую). 5) Сожми журнал в краткий итог (решения, грабли, ссылки) — в конец журнала раздел «Итог»; дешёвой моделью, без пересказа всего подряд.",
+          "execution_timeout_seconds": 900
+        }
+      ]
+    }
+  ],
+  "hooks": {
+    "task_done": [
+      {
+        "type": "notify",
+        "to": "owner",
+        "text": "✅ Баг исправлен и не повторяется: {goal}"
+      }
+    ],
+    "task_failed": [
+      {
+        "type": "notify",
+        "to": "owner",
+        "text": "⚠️ Дебаг остановился: {goal} — {error}"
+      }
+    ]
+  }
+}
