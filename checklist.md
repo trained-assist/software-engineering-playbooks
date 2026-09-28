@@ -48,3 +48,36 @@ Deterministic complexity→price engine (tier × multipliers) + MCP tool + docs 
 - [ ] CI green on this PR
 - [ ] Merged to main
 - [ ] Deployed to prod — verified live
+
+## Checklist — spec-generation move into the engineering repo (issue #43, plan-b86456ed)
+
+Design: `docs/spec-generation-migration.md` (proposal, slices S1–S5, запуск/проверка).
+Директивы 2.В и 3 (голос 28.09.2026). Additive for this repo; вынос из freelance-скила — отдельным PR.
+
+## Goal
+
+Генерация ТЗ живёт здесь: инженерная конкретика + sandbox-блок в содержании (long/short),
+переключаемый стиль (новый ЧБ — дефолт), 6 тулов `engineering_*`, смоук-образцы и e2e/песочница S5.
+
+## Definition of done
+
+- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/44
+- [ ] Merged to main
+- [ ] Deployed to prod — verified live
+
+## Slices
+
+- [x] S1 `src/spec-generation/rules.js`: voice дословно + конкретика + sandbox-блок + стиль
+      (дефолт `oldschool`, неизвестный style → throw) + `tests/spec-generation-rules.test.js`.
+- [x] S2 `src/mcp-skills/tools/65-spec-generation.js`: 6 тулов `engineering_*` (реестр автосканом,
+      `64` занят PR #42), read-compat `spec/` + legacy `tz.md` + `tests/spec-generation-tool.test.js`.
+- [x] S3 prompt-domain `spec-generation.md`; S4 смоук-образцы `docs/examples/spec-{long,short}-classic.md`.
+- [x] S5 `e2e/spec-generation.e2e.mjs` + `test:e2e` (SKIP без окружения) + `test:sandbox` (`--fast`).
+- [x] Проверки до PR: check/manifest:check exit 0; песочница полная PASS S5 (судья PASS);
+      1 красный в `npm test` — преждествующий `tests/workspace.test.js`, падает и на base.
+
+## Non-goals (следующие шаги, помечено в docs)
+
+- Этап 2: «спецификация глубже в инженерную тему» + ideation глубже — отдельным изменением.
+- Сейлз-форма «любой документ → более сейлзовый вид» — отдельная операция, не в генератор.
+- Вынос спецификационной части из `trained-assist-freelance-skill` — отдельный PR после мержа этого.
