@@ -291,3 +291,41 @@ scripts.check (оба плана дописывают строку). Реест�
 
 Песочница намеренно ПАДАЕТ, пока модуль не реализован (срезы S1–S2): так и задумано —
 зелёный до изменений означал бы, что цикл ничего не проверяет.
+
+---
+
+# Реализация (срезы S1–S5) и следующие шаги
+
+Сделано в этой ветке:
+
+- **S1** `src/spec-generation/rules.js` — `SPEC_VOICE_RULES` (дословный перенос), `CONTENT_RULES`
+  (инженерная конкретика), `SBD_RULES` (блок «Как запускается и как проверяется» / «Как проверяем»),
+  `STYLE_RULES` (`oldschool` — дефолт, `modern` — прежний вид), `buildSpecInstruction()`.
+  Тест: `tests/spec-generation-rules.test.js`.
+- **S2** `src/mcp-skills/tools/65-spec-generation.js` — шесть тулов-аналогов, реестр подхватывает
+  файл автоматически; `package.json scripts.check` дополнен двумя новыми файлами.
+  Тест: `tests/spec-generation-tool.test.js`.
+- **S3** prompt-domain `src/prompt-domains/spec-generation.md` (front matter
+  `server/module/when`, гейтится на реальный модуль).
+- **S4** смоук-образцы нового стиля: `docs/examples/spec-long-classic.md`,
+  `docs/examples/spec-short-classic.md` (по фикстуре песочницы).
+- **S5** `e2e/spec-generation.e2e.mjs` + `npm run test:e2e` — та же петля, что и
+  `npm run test:sandbox`; без `opencode` печатает явный `SKIP` и выходит с 0.
+
+**Точка интеграции со сложностью (R10):** движок не дублируется. Если в контексте уже есть
+готовый расчёт — генератор использует его вторично (раздел «Стоимость и сроки»), сам не считает.
+См. комментарий в шапке `src/spec-generation/rules.js` и `engineering_spec_generation_explained`.
+
+**Следующие шаги — НЕ в этот PR (R16):**
+
+1. Этап 2 — «спецификация глубже в инженерную тему»: инженер генерирует ТЗ для себя при
+   планировании; ideation «5 направлений → выбрать оптимальный» выполняется глубже.
+2. Сейлз-форма — отдельная операция «любой документ → более сейлзовый вид»; в генератор НЕ встраивать.
+3. **S7** — отдельный PR в `trained-assist-agent`: `config/skill-catalog.json` (секция
+   `software-engineering`: модуль + prompt-domain) и
+   `docs/user-scenarios/engineering/02-spec-generation.md`; проверка —
+   `node --test test/skills-resolve.test.cjs`.
+4. **S8** — отдельный PR в `trained-assist-freelance-skill`: вынос спецификационной части
+   (тулы `freelance_generate_spec/get_spec/generate_all/generation_note/spec_generation_*`,
+   `SPEC_VOICE_RULES`, `buildSpecInstruction()`, `e2e/spec-generation.e2e.mjs` и их тесты).
+   НЕ трогать: `lib/risk-engine.js`, пайплайн проектов, сам файл `10-freelance-project.js`.
