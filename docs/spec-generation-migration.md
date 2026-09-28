@@ -73,3 +73,172 @@
    CI/staging (R13), смоук-образец ТЗ на диск (R14), e2e или зафиксированный скип (R12).
 4. После мержа — отдельный PR по выносу спецификации из freelance с явными границами (R15).
 5. Не в этот PR, только метка в docs: этап 2 и сейлз-форма (R16).
+
+---
+
+# Design (шаг propose-change, план b86456ed)
+
+## 1. Proposal
+
+**Зачем.** Генерация ТЗ переезжает в инженерный репо (Директива 3, голос 28.09): содержание
+получает инженерную конкретику и sandbox-блок (Директива 2.В), стиль становится переключателем
+с дефолтом «новый ЧБ-олдскульный», кросс-репо ссылка «фриланс → инженер» исчезает (спека и
+движок сложности — в одном репо, сложность используется вторично).
+
+**Что меняется.** (а) Новое ядро правил + MCP-модуль с шестью тулами-аналогами в
+`trained-assist-engineering`; (б) отдельным PR в `trained-assist-agent` — запись модуля в
+каталог скилов + prompt-domain + сценарий; (в) после мержа — отдельный PR выноса спец-части
+из `trained-assist-freelance-skill`.
+
+**Влияние.** Модули: новые `src/spec-generation/`, `src/mcp-skills/tools/65-spec-generation.js`.
+Контракты: 6 новых MCP-тулов `engineering_*`, новый аргумент `style` (дефолт `oldschool` —
+смена дефолтного вида документов, обратима параметром). Данные: раскладка `spec/` та же, что
+во фрилансе (`spec/_source.md`, `spec/long.md`, `spec/short.md`, legacy `spec/tz.md`
+read-compat) → миграция не нужна, существующие проекты читаются без переезда; новый
+профильный файл `~/agent-data/spec-generation/_generation.md` (конвенция репо: профильный
+стейт в `~/agent-data/<module>`). Другие сервисы: core-каталог `config/skill-catalog.json`
+(shadow/exposure-резолвер) + prompt-domain.
+
+## 2. Design (наименьшее изменение)
+
+**Новые файлы (engineering-репо):**
+
+1. `src/spec-generation/rules.js` — ядро, без зависимостей:
+   - `SPEC_VOICE_RULES` — перенос дословно из freelance (`10-freelance-project.js:205–214`);
+   - `CONTENT_RULES` (новое, R5+R6):
+     - конкретика: в ТЗ прямо — какая инфраструктура поднимается (сервисы, БД, очереди,
+       хостинг), какой тестовый сервер/окружение, какие взаимодействия частей (кто с кем и по
+       какому протоколу/очереди), по шагам «что именно делается»; запрет общих слов без привязки;
+     - sandbox-блок (SbDD, §2 дизайн-дока репо): в long обязателен раздел «Как запускается и
+       как проверяется» — команды поднятия окружения, нужные данные/фикстуры, тестовый сервер и
+       порты, наблюдаемый сигнал замкнутой петли, уровень S0–S5 и что делает человек в петле;
+       в short — краткий пункт «Как проверяем» (1–3 строки). R8: действует на ОБА варианта.
+   - `STYLE_RULES = { oldschool, modern }` — правила стиля в коде (R7):
+     - `oldschool` (НОВЫЙ, дефолт): строго чёрно-белый текст, олдскульные простые заголовки
+       (нумерация `1.` / `1.1` или `##` без декора), без эмодзи и «краски», без вводных
+       лид-абзацев, таблицы только простые, документ начинается сразу с предмета;
+     - `modern` (ПРЕЖНИЙ вид): нынешняя аккуратная markdown-верстка, без ограничений oldschool;
+   - `buildSpecInstruction({ name, variants, paths, notes, style })` — та же архитектура, что
+     во фрилансе (ШАГ 1 нормализация → ШАГ 2 независимая генерация; voice + content + style);
+     неизвестный style → ошибка, пустой → `oldschool`.
+2. `src/mcp-skills/tools/65-spec-generation.js` — тулы-аналоги (имена = префикс со swap,
+   R1/R2; `64` занят параллельным планом сложности — PR #42):
+   - `engineering_generate_spec(context_dir, variants='both', style='oldschool')` →
+     читает источники: `context_dir/sources/*.md` + stage-файлы `facts.md`,
+     `requirements.md`, `interpretation.md`, `solution.md` (read-compat с раскладкой
+     freelance); `qna.md`/provenance НЕ передаются; создаёт `context_dir/spec/`, возвращает
+     `{variants, spec_paths, spec_source_path, generation_notes, sources, instruction}`;
+   - `engineering_get_spec(context_dir, variant='both')` — чтение long/short (+legacy `tz.md`
+     для long) + инструкция точечного редактирования;
+   - `engineering_generation_note(text, context_dir?, mode)` — постоянные инструкции:
+     профиль `~/agent-data/spec-generation/_generation.md`, проект `context_dir/spec/generation.md`;
+   - `engineering_generate_all(root, since, variants, style)` — сканирует первые уровни `root`
+     на подкаталоги с `spec/` или stage-файлами, окно как во фрилансе (по умолчанию 6 ч),
+     возвращает таблицу + инструкцию пакетной генерации;
+   - `engineering_spec_generation_defaults(context_dir?)`, `engineering_spec_generation_explained()`
+     — чтение настроек/объяснение пайплайна (включая «правила версионируются в git»).
+3. `tests/spec-generation-rules.test.js` + `tests/spec-generation-tool.test.js` (R11 и соседи).
+4. `package.json` scripts.check += `node --check` двух новых файлов (R3); `test:e2e` скрипт (R12).
+5. `src/prompt-domains/spec-generation.md` — prompt-domain c front matter
+   (`server: engineering-skills`, `module: 65-spec-generation.js`, `when: present`) — как
+   `engineering.md`, но гейтится на реальный модуль.
+6. `docs/spec-generation-migration.md` — Design + точка интеграции со сложностью + следующие
+   шаги (R10/R16/R17). `docs/examples/spec-long-classic.md` + `spec-short-classic.md` (R14).
+
+**Почему не проще:** нельзя просто скопировать файл — freelance-тулы привязаны к индексу и
+корню «Фриланс проекты» (профильный концепт freelance-пайплайна, который по R15 остаётся
+там); вариант «оставить имена `freelance_*`» противоречит R2 и оставляет кросс-репо путаницу.
+Переход на `context_dir` с read-compat раскладки снимает миграцию данных.
+
+**Точка интеграции со сложностью (R10, без дублирования движка):** `src/complexity/`
+(параллельный PR #42, `64-complexity.js`) — в `CONTENT_RULES`/доке: если в контексте есть
+готовый расчёт сложности/цены, использовать его вторично (раздел «Стоимость и сроки»), сам
+движок не вызывать и не воспроизводить. Кодовой связанности с веткой #42 НЕТ → конфликт
+только в `package.json scripts.check` при реbase после мержа #42.
+
+**Каталог (R4), фактический адрес:** `config/skill-catalog.json` в trained-assist-agent
+(секция `software-engineering`: `modules += "engineering-skills/65-spec-generation.js"`,
+`promptDomains += "spec-generation"`) — контракт `test/skills-resolve.test.cjs` требует
+полноты для каждого sibling-модуля и владельца каждого prompt-domain. Файлов из брифа
+(`skill-catalog.json` здесь, `docs/how-to-move-a-tool-to-a-domain-repo.md`) нет — это
+зафиксировано в шаге 3. В этом репо модуль注册ируется автоматически (реестр сканирует
+`tools/`); `provider-manifest.json` не трогаем — как у соседей github/dev/cicd (warn допустим).
+
+## 3. Spec delta (user-scenarios)
+
+- **ADD** (trained-assist-agent, отдельный PR после мержа инженерного):
+  `docs/user-scenarios/engineering/02-spec-generation.md` — «Контекст → Шаги → Validation →
+  Edge cases»: сгенерируй ТЗ (generate_spec → нормализация → long/short в новом стиле),
+  точечная правка (get_spec), постоянная инструкция (generation_note), style=modern.
+  Сценарии инженерного домена живут в core (там же `01-development-playbook.md`); в этом
+  репо каталога сценариев нет.
+- **CHANGE — только в PR выноса (R15):** `freelance/01-freelance-project-spec.md` —
+  спец-часть перенаправляется на engineering-тулы.
+- **DELETE:** ничего в этом PR.
+
+## 4. Срезы (порядок, каждый со своим тестом)
+
+1. **S1 ядро правил** — `src/spec-generation/rules.js` + `tests/spec-generation-rules.test.js`
+   (контракт: voice-правила дословно; конкретика: маркеры инфраструктур/тестовый сервер/
+   взаимодейств; sandbox: «Как запускается и как проверяется» + S0–S5; дефолт style=oldschool,
+   `style='modern'` переключает, неизвестный → throw).
+2. **S2 MCP-модуль** — `65-spec-generation.js` + `tests/spec-generation-tool.test.js`
+   (реестр: 6 тулов, нет коллизий имён; handler generate_spec отдаёт пути/инструкцию и
+   создаёт `spec/`; get_spec читает; generation_note append/replace; generate_all сканирует
+   root) + `package.json` check += файлы → `npm test`/`npm run check` зелёные.
+3. **S3 доки** — prompt-domain `spec-generation.md`, Design/точка интеграции/следующие шаги в
+   `docs/spec-generation-migration.md`.
+4. **S4 смоук-образец** — `docs/examples/spec-long-classic.md` + `spec-short-classic.md`
+   (пишется по правилам нового стиля, владелец видит результат без гадания).
+5. **S5 e2e** — порт `e2e/spec-generation.e2e.mjs` + fixture: тот же каркас (opencode → тулы →
+   structural checks → судья), но вместо `freelance_new_project` — вызов
+   `engineering_generate_spec` в tmp-каталоге; в structural checks добавлены: упоминание
+   инфраструктуры, наличие sandbox-блока, отсутствие эмодзи/декора в new-style; без
+   `opencode`/`OPENROUTER_API_KEY` → SKIP exit 0 (фиксируем в итоге: «скипнулось по
+   отсутствию окружения»).
+6. **S6 PR** — push ветки `eng/…-plan-b86456ed`, PR → `cicd_track_pr`, CI (ci.yml: check +
+   test + manifest:check) зелёный; staging: в этом репо workflow нет — статус отразить явно
+   (см. риски).
+7. **S7 после мержа — core-PR** — `config/skill-catalog.json` (модуль + promptDomain) +
+   `docs/user-scenarios/engineering/02-spec-generation.md`; локально
+   `node --test test/skills-resolve.test.cjs` зелёный.
+8. **S8 вынос из freelance (R15, отдельный PR)** — удалить из
+   `trained-assist-freelance-skill/src/mcp-skills/tools/10-freelance-project.js`: тулы
+   `freelance_generate_spec/get_spec/generate_all/generation_note/spec_generation_defaults/
+   explained`, `SPEC_VOICE_RULES`, `buildSpecInstruction()`, `e2e/spec-generation.e2e.mjs` +
+   их тесты. НЕ трогать: `lib/risk-engine.js`, пайплайн
+   `freelance_new_project/add_info/assess/questions/list/classify_document`, сам файл. Проверки:
+   `npm test`/`npm run check` зелёные; grep по репо и промптам — ни одной ссылки на удалённое;
+   `spec/`-раскладка и `lib/paths.js` specFile-функции остаются (read-compat, ими пользуется
+   engineering-сторона по факту раскладки, не по коду).
+
+Реbase: после мержа PR #42 (движок сложности) — rebase ветки, развести `package.json`
+scripts.check (оба плана дописывают строку). Реестр не конфликтует (автоскан каталога).
+
+## 5. План проверки (шаг сценария → проверка, уровень S)
+
+| Шаг сценария | Проверка | Уровень |
+|---|---|---|
+| Правила содержания/стиля собраны верно | `tests/spec-generation-rules.test.js` (детерминированный контракт instruction, R11) | S5 |
+| Тулы регистрируются и отвечают контрактом | `tests/spec-generation-tool.test.js` + `npm run check` | S5 |
+| Инструкция реально генерирует ТЗ нового стиля | смоук-образец на диске (S4) + e2e structural checks + LLM-судья (S5, при окружении) | S3→S1 |
+| CI | `ci.yml` зелёный на PR | — |
+| Каталог знает модуль | `test/skills-resolve.test.cjs` локально после core-PR | S5 |
+| Вынос не сломал freelance | `npm test`/`npm run check` freelance + grep «нет ссылок на удалённое» | S5 |
+
+## 6. Риски и откат
+
+- **Смена дефолтного стиля (R7)** меняет вид новых ТЗ у всех пользователей → обратимо без
+  деплоя: параметр `style='modern'`. Правила лежат в коде (git diff виден).
+- **Имена/пути тулов (R1)** → после мержа R15-PR: grep-проверка «в freelance и промптах не
+  осталось ссылок на удалённое»; откат R15 = git revert (файлы в git, ничего не удаляется с
+  диска).
+- **Конфликт с PR #42** только в `package.json scripts.check` → rebase-резолв, проверка
+  `npm run check` на собранной ветке.
+- **Staging в репо отсутствует** (нет workflow, у PR только check «test») — по правилу 16.09
+  absent = блокер мержа. Не архитектурная развилка: на шаге приёмки зафиксировать статус
+  явно; минимум — смоук-прогон (S4/S5) как staging-эквивалент с записью результата в PR, либо
+  эскалация отдельным решением владельца. Красного CI не мержить никогда.
+- **Данные:** миграции нет (раскладка `spec/` идентична, legacy `tz.md` читается). Откат
+  любого слайса — revert коммита; новый профильный файл безвреден.
+- **Третий вариант документа (R9):** не заводится — отдельного кода нет, откат не нужен.
