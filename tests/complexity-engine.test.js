@@ -132,16 +132,10 @@ test('stop rule: total K >= 5 raises a warning', () => {
   assert.match(r.warnings[0], /total K = 6 \(>= 5\)/);
 });
 
-test('stop rule not triggered just below the threshold', () => {
-  const r = estimateComplexity({
-    tier: 'T1',
-    observability: { api: 'closed' },
-    architecturalConstraints: true,
-  }); // 3 × 1.7 = 5.1 → still above; use acceptance-not-agreed: 3×1.7=5.1 also above
+test('stop rule not triggered below the threshold', () => {
   const below = estimateComplexity({ tier: 'T1', platforms: ['web', 'ios'], realtime: true }); // 1.3 × 2 = 2.6
   assert.equal(below.k, 2.6);
   assert.deepEqual(below.warnings, []);
-  assert.ok(r.k >= 5); // sanity: the constructed case is above the stop rule
 });
 
 test('unknown fields are reported, not silently multiplied', () => {
