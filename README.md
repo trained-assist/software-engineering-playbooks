@@ -835,7 +835,7 @@ src/
                         # trained-assist-agent core (#1631): github_*, dev_*, cicd_track_pr;
                         # 64-complexity: engineering_estimate_complexity (complexity → price)
   complexity/
-    index.js            # deterministic complexity→price engine (baseline × multipliers, 3 prices)
+    index.js            # deterministic complexity→price engine (base working day × tier-days × multipliers, 3 prices)
   prompt-domains/       # engineering.md, github.setup.md — read by core's prompt-domains loader
   token-value.js        # mirror of trained-assist-agent src/token-value.js (agent-tokens readers)
 

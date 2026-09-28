@@ -2,21 +2,31 @@
 
 // Complexity → price engine (v4 re-weighting, 2026-09-28 owner directive).
 //
-// Formula: price = baseline(tier) × K_observability × K_breadth × K_infra
-//                  × K_realtime × K_arch × K_acceptance
+// Baseline = the cost of ONE ISOLATED WORKING DAY (directive 2, voice 19:28 MSK).
+// Every coefficient is a multiplier OF that day, not a separate per-factor price.
+//
+// Formula: dumping = baseDayRub × tierDays(tier) × K_observability × K_breadth
+//                   × K_infra × K_realtime × K_arch × K_acceptance
 // Three prices are always produced: dumping ×1, commercial ×2, good ×2.5.
 //
 // The observability axis is primary: a closed/unavailable API and a closed
 // infrastructure are independent, large multipliers (≈×3 each) that stack.
 // Breadth (number of platforms) is deliberately small (1.0 / 1.3 / 1.4).
 //
-// Every coefficient is a named constant in COEFFICIENTS so that tuning a number
+// Every coefficient is a named constant in CONFIG so that tuning a number
 // never requires rewriting the logic. Deterministic: no I/O, no clock, no rand.
 
-const COEFFICIENTS = {
-  // Baseline by tier (dumping price, RUB).
-  BASELINE_T0: 5000, // no-UI agent/export
-  BASELINE_T1: 10000, // one static interface
+const CONFIG = {
+  // Baseline: cost of one isolated working day (RUB). The number the owner
+  // dictated ("пусть будет 15000") — retune here, never in the logic.
+  baseDayRub: 15000,
+
+  // Tiers expressed in DAYS relative to that base day. Keeps v3's relation
+  // T1 = 2 × T0 and fits "all isolated, done within a day".
+  tierDays: {
+    T0: 0.5, // no-UI agent/export
+    T1: 1.0, // one static interface
+  },
 
   // Observability axis (primary) — independent, multiply.
   K_API_CLOSED: 3.0, // no test endpoint / access not actually granted
@@ -86,19 +96,20 @@ function estimateComplexity(input = {}) {
     warnings.push(`unknown tier '${tier}' — assumed T0`);
     tier = 'T0';
   }
-  const baseline = tier === 'T1' ? COEFFICIENTS.BASELINE_T1 : COEFFICIENTS.BASELINE_T0;
+  const days = CONFIG.tierDays[tier];
+  const baseline = CONFIG.baseDayRub * days; // dumping price without factors
 
   // --- observability (primary axis) ---------------------------------------
   const obs = project.observability || {};
   if (obs.api === 'closed') {
-    k *= COEFFICIENTS.K_API_CLOSED;
-    factors.observability_api = COEFFICIENTS.K_API_CLOSED;
+    k *= CONFIG.K_API_CLOSED;
+    factors.observability_api = CONFIG.K_API_CLOSED;
   } else if (obs.api === 'unknown') {
     warnings.push("observability.api is 'unknown' — treat as 'closed' if there is no test endpoint");
   }
   if (obs.infra === 'closed') {
-    k *= COEFFICIENTS.K_INFRA_CLOSED;
-    factors.observability_infra = COEFFICIENTS.K_INFRA_CLOSED;
+    k *= CONFIG.K_INFRA_CLOSED;
+    factors.observability_infra = CONFIG.K_INFRA_CLOSED;
   } else if (obs.infra === 'unknown') {
     warnings.push("observability.infra is 'unknown' — treat as 'closed' if access is only in person");
   }
@@ -110,8 +121,8 @@ function estimateComplexity(input = {}) {
     } else {
       const extra = project.platforms.filter((p) => p === 'ios' || p === 'android').length;
       let breadth = 1.0;
-      if (extra === 1) breadth = COEFFICIENTS.BREADTH_ONE_EXTRA;
-      else if (extra >= 2) breadth = COEFFICIENTS.BREADTH_TWO_EXTRA;
+      if (extra === 1) breadth = CONFIG.BREADTH_ONE_EXTRA;
+      else if (extra >= 2) breadth = CONFIG.BREADTH_TWO_EXTRA;
       if (breadth > 1.0) {
         k *= breadth;
         factors.breadth = breadth;
@@ -122,33 +133,33 @@ function estimateComplexity(input = {}) {
   // --- infrastructure complexity ------------------------------------------
   const infra = project.infrastructure || {};
   if (infra.complexity === 'medium') {
-    k *= COEFFICIENTS.K_INFRA_MEDIUM;
-    factors.infra = COEFFICIENTS.K_INFRA_MEDIUM;
+    k *= CONFIG.K_INFRA_MEDIUM;
+    factors.infra = CONFIG.K_INFRA_MEDIUM;
   } else if (infra.complexity === 'high') {
-    k *= COEFFICIENTS.K_INFRA_HIGH;
-    factors.infra = COEFFICIENTS.K_INFRA_HIGH;
+    k *= CONFIG.K_INFRA_HIGH;
+    factors.infra = CONFIG.K_INFRA_HIGH;
   } else if (infra.complexity !== undefined && infra.complexity !== 'low') {
     warnings.push(`unknown infrastructure.complexity '${infra.complexity}' — ignored`);
   }
 
   // --- realtime ------------------------------------------------------------
   if (project.realtime) {
-    k *= COEFFICIENTS.K_REALTIME;
-    factors.realtime = COEFFICIENTS.K_REALTIME;
+    k *= CONFIG.K_REALTIME;
+    factors.realtime = CONFIG.K_REALTIME;
   }
 
   // --- architectural constraints ------------------------------------------
   if (project.architecturalConstraints) {
-    k *= COEFFICIENTS.K_ARCH;
-    factors.arch_constraints = COEFFICIENTS.K_ARCH;
+    k *= CONFIG.K_ARCH;
+    factors.arch_constraints = CONFIG.K_ARCH;
   }
 
   // --- acceptance judges ---------------------------------------------------
   const acc = project.acceptance || {};
   let accK = 1.0;
-  if (acc.notAgreed) accK *= COEFFICIENTS.K_ACCEPTANCE_NOT_AGREED;
-  if (acc.clientTaste) accK *= COEFFICIENTS.K_ACCEPTANCE_CLIENT_TASTE;
-  if (acc.externalMetric) accK *= COEFFICIENTS.K_ACCEPTANCE_EXTERNAL_METRIC;
+  if (acc.notAgreed) accK *= CONFIG.K_ACCEPTANCE_NOT_AGREED;
+  if (acc.clientTaste) accK *= CONFIG.K_ACCEPTANCE_CLIENT_TASTE;
+  if (acc.externalMetric) accK *= CONFIG.K_ACCEPTANCE_EXTERNAL_METRIC;
   if (accK > 1.0) {
     k *= accK;
     factors.acceptance = round2(accK);
@@ -156,9 +167,9 @@ function estimateComplexity(input = {}) {
 
   // --- stop rule -----------------------------------------------------------
   const totalK = round2(k);
-  if (totalK >= COEFFICIENTS.STOP_THRESHOLD) {
+  if (totalK >= CONFIG.STOP_THRESHOLD) {
     warnings.push(
-      `total K = ${totalK} (>= ${COEFFICIENTS.STOP_THRESHOLD}) — propose removing uncertainty before quoting`,
+      `total K = ${totalK} (>= ${CONFIG.STOP_THRESHOLD}) — propose removing uncertainty before quoting`,
     );
   }
 
@@ -172,11 +183,11 @@ function estimateComplexity(input = {}) {
     k: totalK,
     prices: {
       dumping,
-      commercial: round2(dumping * COEFFICIENTS.PRICE_COMMERCIAL),
-      good: round2(dumping * COEFFICIENTS.PRICE_GOOD),
+      commercial: round2(dumping * CONFIG.PRICE_COMMERCIAL),
+      good: round2(dumping * CONFIG.PRICE_GOOD),
     },
     warnings,
   };
 }
 
-module.exports = { estimateComplexity, COEFFICIENTS };
+module.exports = { estimateComplexity, CONFIG };

@@ -3,13 +3,13 @@
 const { estimateComplexity } = require('../../complexity');
 
 // Proxy to the deterministic complexity→price engine: every number lives in
-// src/complexity COEFFICIENTS, this file only declares the MCP contract.
+// src/complexity CONFIG, this file only declares the MCP contract.
 // All fields optional: the engine has defaults (missing tier → T0 + warning)
 // and always answers with a non-empty result.
 module.exports = {
   name: 'engineering_estimate_complexity',
   description:
-    'Deterministic complexity→price estimate for a project profile: baseline (tier) × multipliers (observability axis first, breadth deliberately small), always three prices — dumping ×1, commercial ×2, good ×2.5 — plus applied factors, total K and warnings (K ≥ 5 stop rule, unknown fields).',
+    'Deterministic complexity→price estimate for a project profile: baseline = the cost of one isolated working day, taken in days per tier (CONFIG.baseDayRub × CONFIG.tierDays), then multiplied by risk factors (observability axis first, breadth deliberately small). Always three prices — dumping ×1, commercial ×2, good ×2.5 — plus applied factors, total K and warnings (K ≥ 5 stop rule, unknown fields).',
   inputSchema: {
     type: 'object',
     required: [],
@@ -18,7 +18,7 @@ module.exports = {
         type: 'string',
         enum: ['T0', 'T1'],
         description:
-          'Baseline tier: T0 = no-UI agent/export (smaller baseline), T1 = one static interface (larger baseline). Missing/unknown → T0 with a warning. Exact numbers: COEFFICIENTS in src/complexity.',
+          'Tier in working days: T0 = no-UI agent/export (0.5 day), T1 = one static interface (1.0 day). Missing/unknown → T0 with a warning. Exact numbers: CONFIG in src/complexity (baseDayRub × tierDays).',
       },
       observability: {
         type: 'object',

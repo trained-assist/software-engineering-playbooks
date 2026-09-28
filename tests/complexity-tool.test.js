@@ -14,8 +14,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { callTool, listTools } = require('../src/mcp-skills/registry');
+const { CONFIG } = require('../src/complexity');
 
 const TOOL = 'engineering_estimate_complexity';
+// Baseline price of a tier = one working day × days (directive 2).
+const day = (tier) => CONFIG.baseDayRub * CONFIG.tierDays[tier];
 
 test('scenario: the estimator is registered under its documented MCP name', () => {
   const names = listTools().map((t) => t.name);
@@ -29,12 +32,12 @@ test('scenario: one call turns a profile into tier, factors, K and three prices'
     platforms: ['web', 'ios'],
     realtime: true,
   });
-  // T1 = 10000; K = 3 (closed API, primary axis) × 1.3 (breadth) × 2 (realtime) = 7.8
+  // T1 = one working day; K = 3 (closed API, primary axis) × 1.3 (breadth) × 2 (realtime) = 7.8
   assert.equal(result.tier, 'T1');
   assert.equal(result.k, 7.8);
-  assert.equal(result.prices.dumping, 78000);
-  assert.equal(result.prices.commercial, 156000);
-  assert.equal(result.prices.good, 195000);
+  assert.equal(result.prices.dumping, 117000);
+  assert.equal(result.prices.commercial, 234000);
+  assert.equal(result.prices.good, 292500);
   assert.ok(
     result.warnings.some((w) => /total K/.test(w)),
     'K >= 5 stop rule must surface as a warning',
@@ -44,7 +47,7 @@ test('scenario: one call turns a profile into tier, factors, K and three prices'
 test('scenario: the fixed brief case — closed API alone → K 3, three prices', async () => {
   const result = await callTool(TOOL, { tier: 'T1', observability: { api: 'closed' } });
   assert.equal(result.k, 3);
-  assert.deepEqual(result.prices, { dumping: 30000, commercial: 60000, good: 75000 });
+  assert.deepEqual(result.prices, { dumping: 45000, commercial: 90000, good: 112500 });
 });
 
 test('scenario: observability factors stack independently (closed API × closed infra = 9)', async () => {
@@ -59,6 +62,7 @@ test('scenario: observability factors stack independently (closed API × closed 
     observability_infra: 3,
     breadth: 1.4,
   });
+  assert.equal(result.prices.dumping, day('T0') * 12.6);
 });
 
 test('scenario: the estimator is deterministic (same profile → identical result)', async () => {
@@ -77,5 +81,6 @@ test('scenario: empty arguments still return a usable, non-empty estimate', asyn
   assert.equal(typeof result, 'object');
   assert.ok(result && Object.keys(result).length > 0, 'empty MCP result is forbidden');
   assert.equal(result.tier, 'T0');
+  assert.equal(result.prices.dumping, day('T0'));
   assert.ok(result.prices && typeof result.prices.dumping === 'number');
 });
