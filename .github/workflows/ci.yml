@@ -20,3 +20,18 @@ jobs:
         run: npm test
       - name: Provider manifest contract
         run: npm run manifest:check
+      - name: Build freshness
+        run: npm run check:playbooks
+
+  schema-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone agent and diff schema
+        run: |
+          git clone --depth 1 https://github.com/trained-assist/trained-assist-agent.git /tmp/agent
+          diff contracts/playbook.schema.json /tmp/agent/contracts/playbook.schema.json || {
+            echo "::error::Schema drift detected! Update contracts/playbook.schema.json from trained-assist-agent"
+            echo "Agent version: $(cd /tmp/agent && git rev-parse --short HEAD)"
+            exit 1
+          }
