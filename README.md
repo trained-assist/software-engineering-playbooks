@@ -832,7 +832,10 @@ src/
     registry.js         # tools/*.js auto-discovery; core-shaped modules gated by isReady()/setupTools,
                         # SKILLS_RESOLVED hides 'engineering-skills/<file>' of switched-off sections
     tools/              # 10–50 engineering-native; 60-github, 61-dev, 63-ci-cd moved from
-                        # trained-assist-agent core (#1631): github_*, dev_*, cicd_track_pr
+                        # trained-assist-agent core (#1631): github_*, dev_*, cicd_track_pr;
+                        # 64-complexity: engineering_estimate_complexity (complexity → price)
+  complexity/
+    index.js            # deterministic complexity→price engine (baseline × multipliers, 3 prices)
   prompt-domains/       # engineering.md, github.setup.md — read by core's prompt-domains loader
   token-value.js        # mirror of trained-assist-agent src/token-value.js (agent-tokens readers)
 
