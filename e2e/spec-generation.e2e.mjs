@@ -10,13 +10,17 @@
 // command for CI and for the acceptance record, and so a missing environment
 // turns into an EXPLICIT skip (exit 0), never a silent green.
 //
-// Skip (exit 0, printed): no `opencode` binary or no OPENROUTER_API_KEY.
+// Skip (exit 0, printed): no `opencode` binary, or the loop itself is missing.
+// OPENROUTER_API_KEY only decides whether the optional LLM judge runs — the
+// loop skips the judge explicitly instead of skipping the whole run.
 // Failure inside the loop exits 1 — a red loop is never converted to green.
 
-const fs = require('fs');
-const path = require('path');
-const { spawnSync } = require('child_process');
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
 const SANDBOX = path.join(REPO, 'scripts', 'sandbox', 'spec-generation.mjs');
 
