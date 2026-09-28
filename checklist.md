@@ -38,3 +38,13 @@ idempotently, replacing per-repo hand-wiring — without touching credentials (t
 
 ZeroCreds credential binding and pushing `OPENROUTER_API_KEY` / `AUTOFIX_PAT` to repo Actions
 secrets; run-event lifecycle/notifications; `disable` removing the installed workflow.
+
+## Goal (plan-26741514): complexity → price estimation skill
+
+Deterministic complexity→price engine (tier × multipliers) + MCP tool + docs + tests.
+
+### Definition of done
+
+- [ ] CI green on this PR
+- [ ] Merged to main
+- [ ] Deployed to prod — verified live
