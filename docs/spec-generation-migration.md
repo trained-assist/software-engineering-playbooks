@@ -161,7 +161,7 @@ read-compat) → миграция не нужна, существующие пр
 `promptDomains += "spec-generation"`) — контракт `test/skills-resolve.test.cjs` требует
 полноты для каждого sibling-модуля и владельца каждого prompt-domain. Файлов из брифа
 (`skill-catalog.json` здесь, `docs/how-to-move-a-tool-to-a-domain-repo.md`) нет — это
-зафиксировано в шаге 3. В этом репо модуль注册ируется автоматически (реестр сканирует
+зафиксировано в шаге 3. В этом репо модуль регистрируется автоматически (реестр сканирует
 `tools/`); `provider-manifest.json` не трогаем — как у соседей github/dev/cicd (warn допустим).
 
 ## 3. Spec delta (user-scenarios)
