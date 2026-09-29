@@ -10,7 +10,8 @@
 
 **Что меняется.** Только этот репозиторий (`software-engineering-playbooks`), аддитивно:
 - новый источник `playbooks-src/skill-tool.json` и его сборка (`playbooks/skill-tool.json`, `docs/playbooks/skill-tool.md`, обновлённый `docs/playbooks/step-library.md`);
-- `tests/playbooks.test.js`: список плейбуков и один скил-специфичный тест гейтов;
+- `scripts/sandbox/skill-tool.mjs` (+ скрипт `npm run test:sandbox:skill-tool`) — песочница шага 6/15: одна команда прогоняет 9 шагов сценария через реальные блоки репо (builder, схема, тесты) и сейчас красная, потому что источника ещё нет; сценарные гейты живут ТОЛЬКО здесь (одно место, без дублей с тестами);
+- `tests/playbooks.test.js`: список плейбуков (`:66`) → четыре id (гейты сценария — в песочнице, тест держит схему/инварианты/свежесть сборки);
 - `README.md` / `CLAUDE.md`: строка в таблице плейбуков.
 
 **Влияние.** Рантайм плейбуков, core MCP, схема `contracts/playbook.schema.json`, `library/step-types.json` — **не трогаем**. Данных, миграций, других сервисов не затрагиваем. Новый файл станет видим `playbook_run` только после деплоя ядра, который подтянет sibling-чекаут (карта §3) — до этого он просто не существует, прод не ломается.
@@ -22,7 +23,8 @@
 |---|---|
 | `playbooks-src/skill-tool.json` | новый, ~95 строк: те же паттерны, что `feature.json`, плюс скил-специфика в `notes`/переопределениях |
 | `playbooks/skill-tool.json`, `docs/playbooks/skill-tool.md`, `docs/playbooks/step-library.md` | генерируются `npm run build:playbooks` |
-| `tests/playbooks.test.js` | `:66` список из четырёх id; +1 тест `skill-tool: skill delivery gates` |
+| `tests/playbooks.test.js` | `:66` список из четырёх id (гейты сценария не дублируем — они в песочнице) |
+| `scripts/sandbox/skill-tool.mjs`, `package.json` | петля песочницы 9 шагов сценария (закоммичена на шаге 6/15); гейты: вход `repo`, порядок этапов, `ci_and_staging_green`, два разных `verify-real`, мерж-коммит в релизе (#1818 как запасной путь), `⏭ не нужно` для промпт-домена |
 | `README.md`, `CLAUDE.md` | строка `skill-tool` в таблице, заголовки |
 
 **Структура плейбука** (те же типы шагов из библиотеки, без новых типов):
@@ -57,7 +59,7 @@ archive  archive
 | # | Срез | Тест/проверка | Order |
 |---|---|---|---|
 | S1 | `playbooks-src/skill-tool.json` + `npm run build:playbooks` | `npm run check:playbooks` (свежесть сборки), затем `node --test tests/playbooks.test.js` после S2 | 1 |
-| S2 | `tests/playbooks.test.js`: список `:66` → 4 id; тест «skill-tool: skill delivery gates» (есть `ci_and_staging_green`, два `verify-real`, `deployed`, `explore-context` до `sandbox`) | `npm test` (весь пакет), 0 fail | 2 |
+| S2 | `tests/playbooks.test.js`: список `:66` → 4 id (гейты сценария не дублируем — они в песочнице `scripts/sandbox/skill-tool.mjs`) | `npm test` (весь пакет), 0 fail | 2 |
 | S3 | `README.md`/`CLAUDE.md`: таблица + заголовки | grep-строка `skill-tool` в обоих | 3 |
 | S4 | PR из workspace ветки, CI `ci` + `staging-gate` зелёные на актуальной версии | check-runs + staging-job | 4 |
 | S5 | После мержа — деплой ядра (`deploy-manual`) для подтягивания sibling-чекаута | `playbook_get/playbook_list` резолвят `skill-tool` | 5 |
