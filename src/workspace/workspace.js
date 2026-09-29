@@ -463,6 +463,37 @@ function observeWorkspace(record) {
   return observed;
 }
 
+// `git stash` renders the branch in the stash message differently across git
+// versions: for a slashed branch git 2.34 writes "WIP on alice-task-1" while
+// the workspace branch is "eng/alice-task-1", so a message-only match
+// (entry.includes(record.branch)) silently drops the retention guard and
+// RELEASES a workspace whose uncommitted work is parked in a stash. Match the
+// stash's base commit (stash@{n}^1) against this workspace's tips instead, and
+// read the stash list from the source checkout AND the worktree — newer git
+// keeps stashes per worktree, so the source list alone can be empty.
+function stashBelongsToWorkspace(record, src) {
+  const tips = new Set(
+    [record.baseRevision, record.git && record.git.headRevision, git.currentHead(record.codePath)].filter(Boolean),
+  );
+  const repos = [...new Set([src, record.codePath])]
+    .filter((p) => p && fs.existsSync(p) && git.isGitRepo(p));
+  const refs = new Set();
+  for (const repo of repos) {
+    for (const entry of git.stashEntries(repo)) {
+      if (entry.includes(record.branch)) return true;
+      const colon = entry.indexOf(':');
+      if (colon > 0) refs.add(entry.slice(0, colon));
+    }
+  }
+  for (const ref of refs) {
+    for (const repo of repos) {
+      const base = git.resolveCommit(repo, `${ref}^1`);
+      if (base && tips.has(base)) return true;
+    }
+  }
+  return false;
+}
+
 function evaluateRetention(record, { processesStopped = true, force = false, deliveryEvidence = null } = {}) {
   const reasons = [];
   if (processesStopped !== true && !force) reasons.push('processes_active');
@@ -483,8 +514,7 @@ function evaluateRetention(record, { processesStopped = true, force = false, del
     provenOnRemote = git.remoteBranchesContaining(src, head).length > 0;
     if (!provenOnRemote && !merged) reasons.push(hasRemote ? 'unpushed' : 'unknown_remote');
   }
-  const stashes = git.stashEntries(src);
-  if (stashes.some((entry) => entry.includes(record.branch))) reasons.push('stash');
+  if (stashBelongsToWorkspace(record, src)) reasons.push('stash');
 
   return { removable: reasons.length === 0 || force, reasons, worktreeRegistered: registered, worktreeMissing: false, merged: merged || provenOnRemote };
 }

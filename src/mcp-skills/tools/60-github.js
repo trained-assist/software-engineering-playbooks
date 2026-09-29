@@ -6,11 +6,14 @@
 //
 // Token setup: call connect({ service: "github" }) — universal connect tool handles ZeroCreds form.
 
-const { getToken, hasToken, ghFetch } = require('../../github/client');
+const { getToken, hasToken, ghFetch, ghText } = require('../../github/client');
 const { prStatus } = require('../../github/pr-status-core');
 const GH_API = 'https://api.github.com';
 
 module.exports = {
+  // Shared GitHub plumbing for the neighbouring tool files (ci_run_branch & co).
+  // The registry only reads `.tools`, so extra exports here are inert.
+  getToken, hasToken, ghFetch, ghText,
   isReady: hasToken,
   setupTools: ['github_status'],
 

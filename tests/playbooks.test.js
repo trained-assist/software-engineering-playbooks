@@ -1,6 +1,6 @@
 'use strict';
 
-// Engineering playbooks (feature / debugging / new-software): the committed
+// Engineering playbooks (feature / debugging / new-software / skill-tool): the committed
 // Playbook v1 output is in sync with its sources, valid against the vendored
 // contract, and keeps the process invariants the playbooks are built on.
 
@@ -16,8 +16,16 @@ const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'contracts', 'playbook
 
 // Deterministic validators the agent can poll during a durable wait
 // (trained-assist-agent src/playbook-validators.js createDefaultRegistry).
-const DETERMINISTIC_KEYS = ['ci_green', 'ci_and_staging_green', 'merged', 'pr_merged', 'merged_and_deployed',
+const DETERMINISTIC_KEYS = ['ci_green', 'ci_and_staging_green', 'ci_run_green', 'merged', 'pr_merged', 'merged_and_deployed',
   'pr_opened', 'file_exists', 'command_exit_zero', 'credential_present', 'http_ok', 'task_done'];
+
+// The change-flow playbooks run the full sandbox-driven development loop.
+// ci-setup / ci-run are short operational playbooks (configure / dispatch) — they
+// have no sandbox, no implement and no archive, so the process invariants below
+// apply to the change-flow set only. Schema validity, typed steps and the
+// declared inputs are checked for EVERY playbook.
+const CHANGE_FLOW = new Set(['debugging', 'feature', 'new-software']);
+const ALL_PLAYBOOKS = ['ci-run', 'ci-setup', 'debugging', 'feature', 'new-software', 'skill-tool'];
 
 // Minimal JSON-Schema (draft-07 subset used by playbook.schema.json) — no deps in CI.
 function validate(value, sch, at = '$', errors = []) {
@@ -63,8 +71,8 @@ test('committed playbooks and docs are in sync with sources (npm run build:playb
   }
 });
 
-test('the three engineering playbooks exist', () => {
-  assert.deepEqual(built.map(b => b.id).sort(), ['debugging', 'feature', 'new-software']);
+test('every expected playbook exists (the three change-flow ones plus ci-setup, ci-run and skill-tool)', () => {
+  assert.deepEqual(built.map(b => b.id).sort(), ALL_PLAYBOOKS);
 });
 
 for (const pb of built) {
@@ -91,10 +99,12 @@ for (const pb of built) {
     const repo = (pb.inputs || []).find(i => i.name === 'repo');
     assert.ok(repo, 'repo input declared');
     assert.equal(repo.derive, 'github_repo');
-    // feature/debugging always work in an existing repository; new-software may create it.
+    // feature/debugging/skill-tool always work in an existing repository; new-software may create it.
     assert.equal(repo.required !== false, pb.id !== 'new-software');
   });
+}
 
+for (const pb of built.filter(b => CHANGE_FLOW.has(b.id))) {
   test(`${pb.id}: process invariants`, () => {
     const t = types(pb);
     const before = (a, b) => assert.ok(t.indexOf(a) >= 0 && t.indexOf(a) < t.indexOf(b), `${a} before ${b}`);

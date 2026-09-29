@@ -91,6 +91,24 @@ async function ghFetch(pathOrUrl, opts = {}) {
   try { return JSON.parse(text); } catch { return text; }
 }
 
+// Same authenticated GET as ghFetch, but the body is TEXT: workflow/job logs are
+// served as plain text (and fetch follows the redirect to a signed URL), so
+// res.json() would throw on them. Used by ci_run_branch to tail failed-job logs.
+async function ghText(pathOrUrl, opts = {}) {
+  const token = getToken();
+  const url = pathOrUrl.startsWith('http') ? pathOrUrl : `${GH_API}${pathOrUrl}`;
+  const res = await fetch(url, {
+    ...opts,
+    headers: { ...authHeaders(token), 'Accept': 'application/vnd.github+json', ...opts.headers },
+    signal: opts.signal || AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new GitHubApiError(`GitHub API ${res.status}: ${body.slice(0, 200) || res.statusText}`, res.status, pathOrUrl);
+  }
+  return res.text();
+}
+
 // GraphQL `errors[0].type` → HTTP-ish status so callers share one error path.
 const GQL_STATUS = { FORBIDDEN: 403, NOT_FOUND: 404, RATE_LIMITED: 429, UNAUTHORIZED: 401 };
 
@@ -136,6 +154,7 @@ module.exports = {
   hasToken,
   getToken,
   ghFetch,
+  ghText,
   ghGraphql,
   classify,
 };

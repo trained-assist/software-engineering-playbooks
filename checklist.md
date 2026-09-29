@@ -82,6 +82,53 @@ Design: `docs/spec-generation-migration.md` (proposal, slices S1–S5, запу�
 - Сейлз-форма «любой документ → более сейлзовый вид» — отдельная операция, не в генератор.
 - Вынос спецификационной части из `trained-assist-freelance-skill` — отдельный PR после мержа этого.
 
+## Checklist — ci-setup / ci-run playbooks (issue #51, plan-3e40a139)
+
+Два переиспользуемых системных плейбука «прогон тестов в облаке»: разовый `ci-setup` (workflow_dispatch на целевой репо) и частый `ci-run` (dispatch → durable-ожидание → статус). Дизайн: `docs/ci-cloud-run.md`; сценарий: `docs/user-scenarios/ci/cloud-test-run.md`.
+
+## Definition of done
+
+- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/54
+- [ ] Merged to main
+- [ ] Deployed to prod — verified live
+
+## Checklist — skill-tool: новый MCP-инструмент в скиле (issue #53, plan-aa96d610)
+
+Сценарий: `docs/user-scenarios/playbooks/skill-tool.md` · контекст/требования/дизайн: `skill-tool.{context,requirements,proposal}.md`.
+Путь нового инструмента в доменном скиле закреплён как воспроизводимый плейбук:
+конвенции тулов → заготовка → исполняемый тест → правило промпт-домена → PR (CI+staging) →
+релиз → два разных гейта «виден в новой сессии» / живой вызов.
+
+## Goal
+
+Воспроизводимый процесс «новый MCP-инструмент в скиле»: плейбук проходит валидацию схемы
+в тестах репо; «мерж ≠ прод» разведён на два гейта (виден / вызван); при отсутствии
+staging-джобы в целевом репо — блок и задача, а не молчаливый skip.
+
+## Definition of done
+
+- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/55
+- [ ] Merged to main
+- [ ] Deployed to prod — verified live (плейбук виден в новой сессии; пробный прогон на реальном инструменте)
+
+## Slices
+
+- [x] S1 `playbooks-src/skill-tool.json` (15 шагов, 6 стадий) + сборка `playbooks/skill-tool.json`,
+      `docs/playbooks/skill-tool.md`, `docs/playbooks/step-library.md`.
+- [x] S2 `tests/playbooks.test.js` — список id → 4 (debugging, feature, new-software, skill-tool).
+- [x] S3 `README.md` — заголовок, строка таблицы, строка дерева.
+- [x] Песочница `scripts/sandbox/skill-tool.mjs` + `npm run test:sandbox:skill-tool` (S3, 0,3 с,
+      9 шагов сценария; пропуск шага не считается успехом).
+- [x] Попутный фикс `src/workspace/workspace.js`: guard удержания не зависит от формата
+      stash-сообщения (git 2.34 обрезает `eng/...`) — `workspace.test.js` 25/25.
+- [x] Проверки до PR: check / manifest:check / `npm test` 144/144 / check:playbooks зелёные;
+      песочница PASS 15/15.
+
+## Non-goals
+
+- Пробный прогон на реальном маленьком инструменте и первая живая сессия — после мержа + деплоя ядра.
+- staging-гейт для целевых репозиториев без staging-job — задача в issue #9 (в самом плейбуке), не здесь.
+
 ## Checklist — pr_status / issue_status (issue #52, plan-a738d291)
 
 ## Goal
