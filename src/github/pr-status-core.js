@@ -442,7 +442,7 @@ async function linkedPulls(repo, issue) {
   } catch { /* comments are best-effort */ }
   for (const text of texts) {
     for (const m of text.matchAll(/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)#(\d+)/g)) {
-      pushRef(refs, seen, `${m[1]}/${m[2]}`, m[3], null, 'link');
+      pushRef(refs, seen, m[1], m[2], null, 'link');
     }
     for (const m of text.matchAll(/https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/g)) {
       pushRef(refs, seen, `${m[1]}/${m[2]}`, m[3], m[0], 'link');
