@@ -87,6 +87,14 @@ for (const pb of built) {
     }
   });
 
+  test(`${pb.id}: {repo} in the steps is a declared input (trained-assist-agent#1725)`, () => {
+    const repo = (pb.inputs || []).find(i => i.name === 'repo');
+    assert.ok(repo, 'repo input declared');
+    assert.equal(repo.derive, 'github_repo');
+    // feature/debugging always work in an existing repository; new-software may create it.
+    assert.equal(repo.required !== false, pb.id !== 'new-software');
+  });
+
   test(`${pb.id}: process invariants`, () => {
     const t = types(pb);
     const before = (a, b) => assert.ok(t.indexOf(a) >= 0 && t.indexOf(a) < t.indexOf(b), `${a} before ${b}`);
