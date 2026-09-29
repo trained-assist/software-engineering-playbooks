@@ -67,6 +67,18 @@ test('the three engineering playbooks exist', () => {
   assert.deepEqual(built.map(b => b.id).sort(), ['debugging', 'feature', 'new-software']);
 });
 
+test('exploration steps teach the repo_map-first rule (issue #49)', () => {
+  for (const id of ['feature', 'debugging']) {
+    const pb = built.find(b => b.id === id);
+    const step = steps(pb).find(s => ['explore-context', 'bug-context'].includes(s.step_type));
+    assert.ok(step, `${id}: has an exploration step`);
+    assert.match(`${step.title}\n${step.instructions}`, /repo_map/, `${id}: the rule reached the rendered instructions`);
+  }
+  assert.match(JSON.stringify(library.types['explore-context']), /repo_map/, 'step library teaches the rule');
+  assert.match(fs.readFileSync(path.join(ROOT, 'src', 'prompt-domains', 'engineering.md'), 'utf8'), /repo_map/,
+    'prompt domain teaches the rule');
+});
+
 for (const pb of built) {
   test(`${pb.id}: valid Playbook v1`, () => {
     assert.deepEqual(validate(pb, schema), []);
