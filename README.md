@@ -809,6 +809,10 @@ A roadmap item is not considered implemented merely because it exists in this RE
 ```text
 src/
   prepare-task.js
+  github/
+    client.js           # shared token + REST/GraphQL fetch for github_* / dev_* / pr_status
+    compress-log.js     # vendored compressLog from pr-autofix (failed-job log tail compaction)
+    pr-status-core.js   # pr_status / issue_status engine (checks, verdict, autofix, prod, budget)
   workspace/
     workspace.js        # spawn/status/release/reconcile
     git.js
@@ -833,6 +837,8 @@ src/
                         # SKILLS_RESOLVED hides 'engineering-skills/<file>' of switched-off sections
     tools/              # 10–50 engineering-native; 60-github, 61-dev, 63-ci-cd moved from
                         # trained-assist-agent core (#1631): github_*, dev_*, cicd_track_pr;
+                        # 62-pr-status: pr_status / issue_status (github_pr_checks stays as a
+                        # throwing alias of pr_status);
                         # 64-complexity: engineering_estimate_complexity (complexity → price)
   complexity/
     index.js            # deterministic complexity→price engine (base working day × tier-days × multipliers, 3 prices)
