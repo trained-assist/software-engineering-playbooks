@@ -1,9 +1,25 @@
 # Прогон тестов в облаке: `ci-setup` + `ci-run` — предложение изменения
 
-Статус: proposed (план 3e40a139, 2026-09-29).
+Статус: implemented (план 3e40a139, 2026-09-29).
 Сценарий: `docs/user-scenarios/ci/cloud-test-run.md` (V5).
 Носители: **software-engineering-playbooks** (плейбуки, типы шагов, шаблон, MCP-тул,
 тесты) и **trained-assist-agent** (один валидатор durable-wait в ядре).
+
+### Как запускается и как проверяется
+
+- **Песочница (S5, ~0.3 с, замкнутый цикл):** `npm run test:sandbox:ci` — гоняет шаги
+  сценария через реальный код (`templates/ci.yml`, типы шагов, оба плейбука, MCP-тул
+  `ci_run_branch` против фейкового GitHub API) с `npm run check:playbooks` в середине.
+  Секция про ядро (`ci_run_green`) читает чекаут trained-assist-agent: по умолчанию
+  `/home/vova/trained-assist-agent`, иначе задай `AGENT_REPO=<путь к чекауту>`:
+  `AGENT_REPO=/path/to/trained-assist-agent npm run test:sandbox:ci`.
+  Пока в чекауте нет `src/playbook-validators.js` с `ci_run_green`, эта секция красная —
+  это и есть сигнал, что PR-A (ядро) ещё не дошёл.
+- **Обычные проверки:** `npm run check` (syntax) · `npm test` (юнит, `node --test`) ·
+  `npm run manifest:check` · `npm run check:playbooks` (каталог не устарел).
+- **В проде:** `playbook_run(playbook_id: "ci-setup" | "ci-run", goal: …, vars: {repo: …})`
+  — оба видны в `playbook_list` после того, как чекаут `/home/vova/trained-assist-engineering`
+  обновился до main (см. §5).
 
 ## 1. Proposal — зачем, что меняется, влияние
 

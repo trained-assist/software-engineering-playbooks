@@ -189,8 +189,11 @@ function makeGitHub(cfg) {
     if (method === 'GET' && /\/actions\/workflows(\?|$)/.test(apiPath)) {
       return res(200, { total_count: (cfg.workflows || []).length, workflows: cfg.workflows || [] });
     }
-    if (method === 'GET' && apiPath.startsWith('/contents/')) {
-      const rest = apiPath.slice('/contents/'.length).split('?')[0].replace(/\/$/, '');
+    // A real contents URL is /repos/{owner}/{repo}/contents/{path} — match the
+    // marker anywhere in the path, not only at the start (a `startsWith` guard
+    // could never fire for a valid GitHub contents request).
+    if (method === 'GET' && apiPath.includes('/contents/')) {
+      const rest = apiPath.slice(apiPath.indexOf('/contents/') + '/contents/'.length).split('?')[0].replace(/\/$/, '');
       const files = cfg.files || {};
       if (rest === '.github/workflows') {
         return res(200, Object.keys(files).map(name => ({
