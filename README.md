@@ -6,9 +6,9 @@ Reusable software-engineering control plane for the `trained-assist` ecosystem.
 
 This repository exists to make coding agents **faster, safer and easier to coordinate** across many repositories and many concurrent tasks.
 
-## Engineering playbooks — `feature`, `debugging`, `new-software`, `ci-setup`, `ci-run`
+## Engineering playbooks — `feature`, `debugging`, `new-software`, `ci-setup`, `ci-run`, `skill-tool`
 
-Five executable processes the agent runs as durable plans (sandbox-driven development:
+Six executable processes the agent runs as durable plans (sandbox-driven development:
 first an executable loop that reproduces the user scenario, then the code that passes it).
 The first three are change-flow (sandboxes, PR, deploy, archive); the last two are the
 «прогон тестов в облаке» pair — short operational playbooks with no change-flow.
@@ -20,6 +20,7 @@ The first three are change-flow (sandboxes, PR, deploy, archive); the last two a
 | `new-software` | a new module/service from scratch (Playbook Zero) | [docs/playbooks/new-software.md](docs/playbooks/new-software.md) |
 | `ci-setup` | once per repository: give it a manual "run the full test suite for this branch" workflow (idempotent — a second run says «уже настроено») | [docs/playbooks/ci-setup.md](docs/playbooks/ci-setup.md) |
 | `ci-run` | often, per branch: dispatch that run and get green/red + failed jobs + log tail, waiting durably instead of locally | [docs/playbooks/ci-run.md](docs/playbooks/ci-run.md) |
+| `skill-tool` | a new MCP tool in an existing domain skill: conventions → file + schema → executable test → PR/CI/staging → delivery → live call | [docs/playbooks/skill-tool.md](docs/playbooks/skill-tool.md) |
 
 - **Design, industry mapping (OpenSpec, Spec Kit, Kiro/EARS, Shape Up, Temporal…), ladders and flags:**
   [docs/engineering-playbooks-design-sandbox-driven-development-and-industry-mapping.md](docs/engineering-playbooks-design-sandbox-driven-development-and-industry-mapping.md)
@@ -851,7 +852,7 @@ templates/ci.yml        # manual test-run workflow for a repo without one (ci-se
 
 contracts/              # incl. playbook.schema.json (vendored Playbook v1)
 library/                # step-types.json — typed step library (sub-steps, ladders, flags)
-playbooks-src/          # feature / debugging / new-software / ci-setup / ci-run sources
+playbooks-src/          # feature / debugging / new-software / ci-setup / ci-run / skill-tool sources
 playbooks/              # built Playbook v1 JSON (+ prose procedures prepare-task, connect-github)
 docs/                   # docs/playbooks/*.md — generated readable playbooks
 examples/
