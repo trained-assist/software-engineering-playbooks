@@ -79,5 +79,34 @@ Design: `docs/spec-generation-migration.md` (proposal, slices S1–S5, запу�
 ## Non-goals (следующие шаги, помечено в docs)
 
 - Этап 2: «спецификация глубже в инженерную тему» + ideation глубже — отдельным изменением.
-- Сейлз-форма «любой документ → более сейлзовый вид» — отдельная операция, не в генератор.
+- Сейлз-форма «любой документ → более сейлзовый вид» — отдельная операция, не в генераторе.
 - Вынос спецификационной части из `trained-assist-freelance-skill` — отдельный PR после мержа этого.
+
+## Checklist — repo maps L0/L1 (эпик #49, plan-61ac1e86)
+
+Сжатые карты репозитория: L1 «скелет» (детерминированный парсер, без LLM) + L0 «карта» (≤ 2k токенов,
+однострочные описания дешёвой моделью, кеш по commit sha). Тул `repo_map(repo, level, focus)`,
+сборка при `engineering_spawn_workspace` + ленивая достройка нового sha, правило «сначала repo_map».
+Сценарий: одна карта < 1 с из кеша вместо десятков открытых файлов (~480 поисков за 10 дней).
+
+## Goal
+
+Первый шаг разведки — карта репозитория: `< 1 с` из кеша, ≤ 2k токенов на L0, без блужданий по файлам.
+
+## Definition of done
+
+- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/59
+- [ ] Merged to main
+- [ ] Deployed to prod — verified live
+
+## Slices
+
+- [x] 1. Общий кеш карт по commit sha вне worktree.
+- [x] 2. Парсер JS через вендоренный acorn (закрыты пробелы CJS/метод-скана).
+- [x] 3. Рендер L1 «скелет» (детерминированный).
+- [x] 4. Рендер L0 «карта» ≤ 2k токенов.
+- [x] 5. LLM-описания L0 + деградация без ключа.
+- [x] 6. MCP-тул `repo_map` + provider manifest.
+- [x] 7. Фоновый сбор при спавне + ленивая достройка (+ kill-switch `REPO_MAP_SPAWN_BUILD`).
+- [x] 8. Правило «сначала repo_map» в плейбуках feature/debugging.
+- [x] 9. Тесты срезов + песочница `npm run sandbox:repo-map` (S5).
