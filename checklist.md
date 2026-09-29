@@ -88,6 +88,6 @@ Design: `docs/spec-generation-migration.md` (proposal, slices S1–S5, запу�
 
 ## Definition of done
 
-- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/47
+- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/54
 - [ ] Merged to main
 - [ ] Deployed to prod — verified live
