@@ -1,6 +1,6 @@
 'use strict';
 
-// Engineering playbooks (feature / debugging / new-software): the committed
+// Engineering playbooks (feature / debugging / new-software / skill-tool): the committed
 // Playbook v1 output is in sync with its sources, valid against the vendored
 // contract, and keeps the process invariants the playbooks are built on.
 
@@ -63,8 +63,8 @@ test('committed playbooks and docs are in sync with sources (npm run build:playb
   }
 });
 
-test('the three engineering playbooks exist', () => {
-  assert.deepEqual(built.map(b => b.id).sort(), ['debugging', 'feature', 'new-software']);
+test('the engineering playbooks exist', () => {
+  assert.deepEqual(built.map(b => b.id).sort(), ['debugging', 'feature', 'new-software', 'skill-tool']);
 });
 
 for (const pb of built) {
@@ -91,7 +91,7 @@ for (const pb of built) {
     const repo = (pb.inputs || []).find(i => i.name === 'repo');
     assert.ok(repo, 'repo input declared');
     assert.equal(repo.derive, 'github_repo');
-    // feature/debugging always work in an existing repository; new-software may create it.
+    // feature/debugging/skill-tool always work in an existing repository; new-software may create it.
     assert.equal(repo.required !== false, pb.id !== 'new-software');
   });
 
