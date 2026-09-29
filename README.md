@@ -6,9 +6,9 @@ Reusable software-engineering control plane for the `trained-assist` ecosystem.
 
 This repository exists to make coding agents **faster, safer and easier to coordinate** across many repositories and many concurrent tasks.
 
-## Engineering playbooks — `feature`, `debugging`, `new-software`
+## Engineering playbooks — `feature`, `debugging`, `new-software`, `skill-tool`
 
-Three executable processes the agent runs as durable plans (sandbox-driven development:
+Four executable processes the agent runs as durable plans (sandbox-driven development:
 first an executable loop that reproduces the user scenario, then the code that passes it).
 
 | Playbook | When | Readable version |
@@ -16,6 +16,7 @@ first an executable loop that reproduces the user scenario, then the code that p
 | `feature` | most common: a feature or change in an existing product | [docs/playbooks/feature.md](docs/playbooks/feature.md) |
 | `debugging` | a bug, regression or error in the logs | [docs/playbooks/debugging.md](docs/playbooks/debugging.md) |
 | `new-software` | a new module/service from scratch (Playbook Zero) | [docs/playbooks/new-software.md](docs/playbooks/new-software.md) |
+| `skill-tool` | a new MCP tool in an existing domain skill: conventions → file + schema → executable test → PR/CI/staging → delivery → live call | [docs/playbooks/skill-tool.md](docs/playbooks/skill-tool.md) |
 
 - **Design, industry mapping (OpenSpec, Spec Kit, Kiro/EARS, Shape Up, Temporal…), ladders and flags:**
   [docs/engineering-playbooks-design-sandbox-driven-development-and-industry-mapping.md](docs/engineering-playbooks-design-sandbox-driven-development-and-industry-mapping.md)
@@ -843,7 +844,7 @@ templates/githooks/     # pre-commit / pre-push installed by dev_workspace_setup
 
 contracts/              # incl. playbook.schema.json (vendored Playbook v1)
 library/                # step-types.json — typed step library (sub-steps, ladders, flags)
-playbooks-src/          # feature / debugging / new-software sources
+playbooks-src/          # feature / debugging / new-software / skill-tool sources
 playbooks/              # built Playbook v1 JSON (+ prose procedures prepare-task, connect-github)
 docs/                   # docs/playbooks/*.md — generated readable playbooks
 examples/
