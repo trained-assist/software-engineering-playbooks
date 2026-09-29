@@ -19,11 +19,13 @@ Typed step library for the engineering playbooks. One step type = one reusable u
 | `root-cause` | Корневая причина | explore → propose | researcher · master | `root_cause_identified_with_evidence` | debugging |
 | `implement` | Реализация в изолированном workspace | apply | developer · master | `implementation_complete_and_sandbox_green` | debugging, feature, new-software |
 | `verify-local` | Полная локальная проверка | apply (verify) | verifier · bachelor | `local_checks_and_tests_green` | debugging, feature, new-software |
-| `open-pr` | Открыть PR | apply (submit) | developer · bachelor | `pr_opened` | debugging, feature, new-software |
-| `ci-green` | CI зелёный (ждём; чиним, если красный) | apply (verify) | developer · bachelor | `ci_green` | debugging, feature, new-software |
-| `merged` | PR смержен | apply (deliver) | программно | `merged` | debugging, feature, new-software |
+| `ci-setup` | Настроить ручной прогон тестов в репозитории | setup (ci) | developer · master | `ci_workflow_configured` | ci-setup |
+| `ci-run` | Прогнать тесты ветки в облаке и вернуть результат | apply (verify) | developer · bachelor | `cloud_test_result_reported` | ci-run |
+| `open-pr` | Открыть PR | apply (submit) | developer · bachelor | `pr_opened` | ci-setup, debugging, feature, new-software |
+| `ci-green` | CI зелёный (ждём; чиним, если красный) | apply (verify) | developer · bachelor | `ci_green` | ci-setup, debugging, feature, new-software |
+| `merged` | PR смержен | apply (deliver) | программно | `merged` | ci-setup, debugging, feature, new-software |
 | `deployed` | Деплой прошёл и живой | apply (deliver) | verifier · bachelor | `deployed_version_is_live` | debugging, feature |
-| `verify-real` | Проверка сценария в реальном окружении | apply (verify) | verifier · master | `user_scenario_verified_in_real_environment` | feature, new-software |
+| `verify-real` | Проверка сценария в реальном окружении | apply (verify) | verifier · master | `user_scenario_verified_in_real_environment` | ci-setup, feature, new-software |
 | `observe` | Наблюдение после релиза (если нужно) | — | verifier · bachelor | `post_release_observation_done_or_not_needed` | feature |
 | `confirm-fixed` | Подтвердить, что ошибка ушла в проде | — | verifier · bachelor | `error_gone_in_production` | debugging |
 | `repo-bootstrap` | Каркас репозитория | — (Spec Kit: constitution) | developer · bachelor | `repo_bootstrapped_with_ci_and_docs` | new-software |

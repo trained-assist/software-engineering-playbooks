@@ -81,3 +81,13 @@ Design: `docs/spec-generation-migration.md` (proposal, slices S1–S5, запу�
 - Этап 2: «спецификация глубже в инженерную тему» + ideation глубже — отдельным изменением.
 - Сейлз-форма «любой документ → более сейлзовый вид» — отдельная операция, не в генератор.
 - Вынос спецификационной части из `trained-assist-freelance-skill` — отдельный PR после мержа этого.
+
+## Checklist — ci-setup / ci-run playbooks (issue #51, plan-3e40a139)
+
+Два переиспользуемых системных плейбука «прогон тестов в облаке»: разовый `ci-setup` (workflow_dispatch на целевой репо) и частый `ci-run` (dispatch → durable-ожидание → статус). Дизайн: `docs/ci-cloud-run.md`; сценарий: `docs/user-scenarios/ci/cloud-test-run.md`.
+
+## Definition of done
+
+- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/54
+- [ ] Merged to main
+- [ ] Deployed to prod — verified live
