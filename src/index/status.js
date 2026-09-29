@@ -13,9 +13,13 @@ const { repositoryIdentity, currentRevision, isGitRepo } = require('./build');
 function rootFor(repoPath, opts) {
   const abs = path.resolve(repoPath);
   // Lazy require: repo-map/paths needs ./build above, and status is loaded
-  // after build in every entry point.
-  const { resolveIndexRoot } = require('../repo-map/paths');
-  return resolveIndexRoot(abs, opts);
+  // after build in every entry point. workspacesRoot defaults to the profile
+  // root, so callers never have to know where the shared cache lives.
+  const { resolveIndexRoot, resolveWorkspacesRoot } = require('../repo-map/paths');
+  return resolveIndexRoot(abs, {
+    workspacesRoot: resolveWorkspacesRoot(opts && opts.workspacesRoot),
+    revision: opts && opts.baseRevision,
+  });
 }
 
 function readIndexMeta(repoPath, opts) {
