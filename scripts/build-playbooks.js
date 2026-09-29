@@ -103,6 +103,7 @@ function buildPlaybook(library, src) {
   };
   if (src.user_value_template) out.user_value_template = src.user_value_template;
   if (src.defaults) out.defaults = src.defaults;
+  if (src.inputs) out.inputs = src.inputs;
   out.stages = src.stages.map(stage => {
     const built = { id: stage.id, title: stage.title };
     if (stage.on_enter) built.on_enter = stage.on_enter;

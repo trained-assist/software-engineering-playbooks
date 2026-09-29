@@ -10,6 +10,14 @@
     "execution_timeout_seconds": 1200,
     "recovery_policy": "default"
   },
+  "inputs": [
+    {
+      "name": "repo",
+      "description": "целевой репозиторий owner/name, если он уже есть (новый заводится на шаге repo-bootstrap)",
+      "required": false,
+      "derive": "github_repo"
+    }
+  ],
   "stages": [
     {
       "id": "frame",
