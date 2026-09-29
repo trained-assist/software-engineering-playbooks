@@ -51,7 +51,9 @@ Issue: trained-assist/software-engineering-playbooks#52 (бэклог #50, п.2)
    PR в других репозиториях, и возвращает `issue:{state,title}` + `prs[]` с тем же
    компактным статусом по каждому (без логов, если не `include_logs:true`).
 5. Алиасы. КОГДА вызывается `github_pr_checks(repo, pr_number)` ТОГДА он отдаёт тот же
-   результат через ядро `pr_status` (обратная совместимость полей total/summary/runs).
+   результат через ядро `pr_status` (обратная совместимость полей total/summary/runs);
+   ошибки он продолжает БРОСАТЬ (как раньше), а сам `pr_status` возвращает типизированный
+   `ok:false, error:{code}` — решение по дизайну (см. [design](pr-issue-status-design.md)).
    `cicd_track_pr` — НЕ дубль (пишет checklist.md для GTD, это регистрация, а не чтение
    статуса); остаётся отдельным, в описании ссылается на `pr_status` для разовой проверки.
    Решение фиксируется в PR.
