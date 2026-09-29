@@ -6,57 +6,11 @@
 //
 // Token setup: call connect({ service: "github" }) — universal connect tool handles ZeroCreds form.
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { readTokenValue } = require('../../token-value');
-
+const { getToken, hasToken, ghFetch } = require('../../github/client');
 const GH_API = 'https://api.github.com';
-const USER_ID = process.env.USER_ID || '';
-
-function getToken() {
-  const tok = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-  if (tok) return tok;
-  if (USER_ID) {
-    try {
-      const p = path.join(os.homedir(), 'agent-tokens', USER_ID, 'github');
-      if (fs.existsSync(p)) return readTokenValue(fs.readFileSync(p, 'utf8'));
-    } catch {}
-  }
-  throw new Error(
-    'GitHub токен не задан. Вызови github_connect — получишь защищённую ссылку для ввода токена без отправки в чат.'
-  );
-}
-
-async function ghFetch(path, opts = {}) {
-  const token = getToken();
-  const url = path.startsWith('http') ? path : `${GH_API}${path}`;
-  const res = await fetch(url, {
-    ...opts,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'trained-assist-agent',
-      ...opts.headers,
-    },
-    signal: opts.signal || AbortSignal.timeout(15000),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = err.message || res.statusText;
-    throw new Error(`GitHub API ${res.status}: ${msg}`);
-  }
-  if (res.status === 204) return null;
-  return res.json();
-}
 
 module.exports = {
-  isReady: () => {
-    if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
-    if (!USER_ID) return false;
-    return fs.existsSync(path.join(os.homedir(), 'agent-tokens', USER_ID, 'github'));
-  },
+  isReady: hasToken,
   setupTools: ['github_status'],
 
   tools: {
