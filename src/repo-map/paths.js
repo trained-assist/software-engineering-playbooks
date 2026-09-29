@@ -58,11 +58,13 @@ function shaFor(repoPath) {
 // already owns a legacy `.engineering/index` keeps using it (it is fresh for
 // its own HEAD by construction); a fresh worktree with no local index resolves
 // the shared per-sha copy instead — that is how worktrees share one cache.
-function resolveIndexRoot(repoPath, { workspacesRoot } = {}) {
+// `revision` is only needed when the caller cares about something other than
+// the checked-out commit (e.g. a PR base).
+function resolveIndexRoot(repoPath, { workspacesRoot, revision } = {}) {
   const abs = path.resolve(repoPath);
   const legacy = indexRoot(abs);
   if (fs.existsSync(path.join(legacy, 'revision.json'))) return legacy;
-  const sha = shaFor(abs);
+  const sha = revision || shaFor(abs);
   if (!sha) return legacy;
   const shared = indexDirFor({ repoPath: abs, workspacesRoot, sha });
   if (fs.existsSync(path.join(shared, 'revision.json'))) return shared;

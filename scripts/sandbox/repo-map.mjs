@@ -15,11 +15,14 @@
 //
 // КОНТРАКТ для шага implement (реализация обязана ему соответствовать):
 //   require('../src/repo-map') → {
-//     buildMap({ repoPath, workspacesRoot }) → { status: 'built'|'exists', sha, dir },
+//     buildMap({ repoPath, workspacesRoot }) → Promise<{ status: 'built'|'exists', sha, dir }>,
 //     renderMap({ repoPath, workspacesRoot, level, focus?, sha? })
-//       → { status: 'ready'|'missing'|'failed', text, sha }   // text не пустой всегда
-//     mapStatus({ repoPath, workspacesRoot }) → { status, sha, dir },
+//       → Promise<{ status: 'ready'|'missing'|'failed', text, sha }>,  // text не пустой всегда
+//     mapStatus({ repoPath, workspacesRoot }) → { status, sha, dir },   // синхронный
 //   }
+//   Асинхронность обязательна: LLM-описания для L0 собираются через fetch,
+//   а await в синхронном коде невозможен — поэтому три первых метода
+//   возвращают промис (mapStatus остаётся синхронным: он ничего не строит).
 //   Кеш: <workspacesRoot>/repo-maps/<repoId>/<sha>/ (вне worktree).
 //   LLM: src/repo-map/llm.js зовёт ГЛОБАЛЬНЫЙ fetch к OpenRouter
 //   POST https://openrouter.ai/api/v1/chat/completions и читает
@@ -110,14 +113,19 @@ test('route', () => { routeTask({ id: 1 }); });
   git(dir, ['commit', '-q', '-m', 'fixture v1']);
   const sha1 = git(dir, ['rev-parse', 'HEAD']);
 
-  write('src/new-feature.js', `'use strict';
+  // Second commit is NOT created here: scenario step 2 needs a map that is
+  // first built at sha1 and then invalidated by a new commit, so the bump
+  // happens right before the invalidation section.
+  const bump = () => {
+    write('src/new-feature.js', `'use strict';
 function newFeature(flag) { return flag ? 'on' : 'off'; }
 module.exports = { newFeature };
 `);
-  git(dir, ['add', '.']);
-  git(dir, ['commit', '-q', '-m', 'fixture v2']);
-  const sha2 = git(dir, ['rev-parse', 'HEAD']);
-  return { dir, sha1, sha2 };
+    git(dir, ['add', '.']);
+    git(dir, ['commit', '-q', '-m', 'fixture v2']);
+    return git(dir, ['rev-parse', 'HEAD']);
+  };
+  return { dir, sha1, bump };
 }
 
 // Fresh require of everything under src/ (LLM key is read at load time).
@@ -132,7 +140,7 @@ async function main() {
   const workspacesRoot = path.join(root, 'workspaces');
   fs.mkdirSync(workspacesRoot, { recursive: true });
   const fixture = makeFixtureRepo(root);
-  log(`fixture: ${path.basename(fixture.dir)}, sha1=${fixture.sha1.slice(0, 8)}, sha2=${fixture.sha2.slice(0, 8)}`);
+  log(`fixture: ${path.basename(fixture.dir)}, sha1=${fixture.sha1.slice(0, 8)} (второй коммит создаётся в фазе инвалидации)`);
 
   delete process.env.OPENROUTER_API_KEY;
   const started = Date.now();
@@ -154,7 +162,7 @@ async function main() {
   if (hasApi) {
     let built;
     try {
-      built = repoMap.buildMap({ repoPath: fixture.dir, workspacesRoot });
+      built = await repoMap.buildMap({ repoPath: fixture.dir, workspacesRoot });
       check(built && built.status === 'built', `buildMap: статус built (получено ${built && built.status})`);
       sha1 = built && built.sha;
       check(sha1 === fixture.sha1, `buildMap: sha совпадает с HEAD (${sha1 && sha1.slice(0, 8)})`);
@@ -166,7 +174,7 @@ async function main() {
     }
 
     try {
-      const r = repoMap.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
+      const r = await repoMap.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
       const text = (r && r.text) || '';
       check(r && r.status === 'ready', `L0 без ключа: status=ready (получено ${r && r.status})`);
       check(text.trim().length > 0, 'L0 без ключа: ответ не пустой');
@@ -198,13 +206,13 @@ async function main() {
     reloadSrc();
     const mod = require(path.join(REPO, 'src', 'repo-map'));
     try {
-      mod.buildMap({ repoPath: fixture.dir, workspacesRoot });
+      await mod.buildMap({ repoPath: fixture.dir, workspacesRoot });
       check(fetchCalls > 0, `с ключом: LLM вызвана через fetch (вызовов: ${fetchCalls})`);
-      const l0 = mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
+      const l0 = await mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
       check(String((l0 && l0.text) || '').includes(MOCK_DESCRIPTION), 'L0 с ключом: описания LLM в карте');
 
       const before = fetchCalls;
-      const again = mod.buildMap({ repoPath: fixture.dir, workspacesRoot });
+      const again = await mod.buildMap({ repoPath: fixture.dir, workspacesRoot });
       check(again && again.status === 'exists', `повторная сборка того же sha: status=exists (${again && again.status})`);
       check(fetchCalls === before, `кеш описаний: повторная сборка без LLM-вызовов (${fetchCalls - before})`);
     } catch (e) {
@@ -214,8 +222,8 @@ async function main() {
 
     // ── 5. L1: skeleton, CJS/methods, focus, byte-identical, cache < 1s ────
     try {
-      const a = mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 1 });
-      const b = mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 1 });
+      const a = await mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 1 });
+      const b = await mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 1 });
       const text = (a && a.text) || '';
       check(a && a.status === 'ready' && text.trim().length > 0, 'L1: готовый не пустой ответ');
       check(typeof b.text === 'string' && a.text === b.text, 'L1: повтор = байт-в-байт');
@@ -224,11 +232,11 @@ async function main() {
         else check(false, `L1 содержит «${token}» (CJS-экспорт/метод)`);
       }
       const t0 = Date.now();
-      mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
+      await mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
       const dt = Date.now() - t0;
       check(dt < 1000, `L0 из кеша < 1 с (${dt} мс)`);
 
-      const f = mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 1, focus: ['routeTask'] });
+      const f = await mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 1, focus: ['routeTask'] });
       const ft = (f && f.text) || '';
       const iRouter = ft.indexOf('src/router.js');
       const iServer = ft.indexOf('src/server.js');
@@ -239,13 +247,14 @@ async function main() {
 
     // ── 6. Invalidation: new sha after commit is served lazily ─────────────
     try {
-      const r = mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
+      fixture.sha2 = fixture.bump();
+      const r = await mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
       check(r && r.sha === fixture.sha2, `после коммита: ленивая достройка нового sha (${r && r.sha && r.sha.slice(0, 8)})`);
       check(String(r.text || '').includes('new-feature'), 'после коммита: новый файл в карте');
       const st = mod.mapStatus({ repoPath: fixture.dir, workspacesRoot });
       check(st && st.sha === fixture.sha2 && st.status === 'ready', `mapStatus: sha2 ready (${st && st.status})`);
       fs.rmSync(path.join(workspacesRoot, 'repo-maps'), { recursive: true, force: true });
-      const rebuilt = mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
+      const rebuilt = await mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0 });
       check(rebuilt && rebuilt.status === 'ready', 'кеш удалён → renderMap достраивает сам');
       check(fs.existsSync(path.join(workspacesRoot, 'repo-maps')), 'после достройки кеш-каталог снова есть');
     } catch (e) {
@@ -255,7 +264,7 @@ async function main() {
     // ── 7. Foreign sha is never served as ready; answer never empty ────────
     try {
       const foreignSha = '0'.repeat(40);
-      const r = mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0, sha: foreignSha });
+      const r = await mod.renderMap({ repoPath: fixture.dir, workspacesRoot, level: 0, sha: foreignSha });
       check(r && r.status !== 'ready', `чужой sha не отдаётся как ready (${r && r.status})`);
       check(Boolean(r && String(r.text || '').trim()), 'чужой sha: ответ всё равно не пустой (совет читать сырой репо)');
       const st = mod.mapStatus({ repoPath: fixture.dir, workspacesRoot });
