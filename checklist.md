@@ -141,7 +141,7 @@ staging-джобы в целевом репо — блок и задача, а �
 
 ## Definition of done
 
-- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/59
+- [x] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/62 (supersedes #59: ветка перебазирована на main, #59 конфликтовал — его CI не запускался)
 - [ ] Merged to main
 - [ ] Deployed to prod — verified live
 
