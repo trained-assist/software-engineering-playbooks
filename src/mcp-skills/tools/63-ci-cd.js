@@ -92,7 +92,8 @@ module.exports = {
         '20 minutes" needed, and it survives restarts. Writes a checklist.md in the current project directory; the ' +
         'background controller re-checks CI/merge status directly via the GitHub API for free and only wakes an ' +
         'expensive Claude/Codex session if something actually still needs attention. Works from any MCP client ' +
-        '(Claude Code, Codex, etc.) — this is the shared reflex, not a client-local convention.',
+        '(Claude Code, Codex, etc.) — this is the shared reflex, not a client-local convention. ' +
+        'This only registers tracking; for a one-off status check of a PR call pr_status (or issue_status for an issue).',
       inputSchema: {
         type: 'object',
         required: ['pr_url'],

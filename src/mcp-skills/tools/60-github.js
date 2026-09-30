@@ -6,108 +6,15 @@
 //
 // Token setup: call connect({ service: "github" }) — universal connect tool handles ZeroCreds form.
 
-const fs = require('fs');
-const path = require('path');
-const { readTokenValue } = require('../../token-value');
-const { tokensRoot } = require('../../data-paths');
-// Credential store (trained-assist-agent#1939): legacy plaintext passes through,
-// an encrypted `github` file is decrypted — a raw readFileSync would hand back
-// base64 garbage once CRED_ENCRYPTION_KEY is provisioned.
-const { readCredentialFile } = require('../../credential-store');
-
+const { getToken, hasToken, ghFetch, ghText } = require('../../github/client');
+const { prStatus } = require('../../github/pr-status-core');
 const GH_API = 'https://api.github.com';
-const USER_ID = process.env.USER_ID || '';
-
-function tokenPath(uid) {
-  return path.join(tokensRoot(), uid, 'github');
-}
-
-function getToken() {
-  const tok = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-  if (tok) return tok;
-  if (USER_ID) {
-    try {
-      const p = tokenPath(USER_ID);
-      if (fs.existsSync(p)) return readTokenValue(readCredentialFile(p));
-    } catch (e) {
-      // Encrypted file without CRED_ENCRYPTION_KEY (or an unreadable one):
-      // never fall back to the base64 stub — degrade to "no token", loudly.
-      if (e && e.code !== 'ENOENT') console.warn('[github] cannot read the token file: %s', e.message);
-    }
-  }
-  throw new Error(
-    'GitHub токен не задан. Вызови github_connect — получишь защищённую ссылку для ввода токена без отправки в чат.'
-  );
-}
-
-async function ghFetch(path, opts = {}) {
-  const token = getToken();
-  const url = path.startsWith('http') ? path : `${GH_API}${path}`;
-  const res = await fetch(url, {
-    ...opts,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'trained-assist-agent',
-      ...opts.headers,
-    },
-    signal: opts.signal || AbortSignal.timeout(15000),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = err.message || res.statusText;
-    throw new Error(`GitHub API ${res.status}: ${msg}`);
-  }
-  if (res.status === 204) return null;
-  return res.json();
-}
-
-// Same authenticated GET, but the body is TEXT: workflow/job logs are served as
-// plain text (and the browser/agent follows the redirect to a signed URL), so
-// ghFetch's res.json() would throw on them.
-async function ghText(path, opts = {}) {
-  const token = getToken();
-  const url = path.startsWith('http') ? path : `${GH_API}${path}`;
-  const res = await fetch(url, {
-    ...opts,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'trained-assist-agent',
-      ...opts.headers,
-    },
-    signal: opts.signal || AbortSignal.timeout(15000),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200) || res.statusText}`);
-  }
-  return res.text();
-}
-
-// Cheap "is a GitHub token available at all?" — reads USER_ID from the
-// environment on every call (the module-level one is captured at load), so a
-// caller can turn "no token" into an explicit contract error instead of
-// letting getToken()'s message leak through.
-function hasToken() {
-  if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
-  const uid = process.env.USER_ID;
-  if (!uid) return false;
-  try { return fs.existsSync(tokenPath(uid)); }
-  catch { return false; }
-}
 
 module.exports = {
   // Shared GitHub plumbing for the neighbouring tool files (ci_run_branch & co).
   // The registry only reads `.tools`, so extra exports here are inert.
   getToken, hasToken, ghFetch, ghText,
-  isReady: () => {
-    if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
-    if (!USER_ID) return false;
-    return fs.existsSync(tokenPath(USER_ID));
-  },
+  isReady: hasToken,
   setupTools: ['github_status'],
 
   tools: {
@@ -345,7 +252,9 @@ module.exports = {
     },
 
     github_pr_checks: {
-      description: 'Get CI/check-runs status for a pull request. Reads the PR, then its head commit check-runs (the same path the GTD controller uses). Use this to answer "did CI pass / what PR status is" without opening the browser.',
+      description: 'Alias of pr_status — prefer pr_status (it adds failed-job log tails, autofix PR, prod verdict). ' +
+        'Kept for backward compatibility: same handler as pr_status but, unlike it, THROWS on error (missing PR → ' +
+        '"GitHub API 404", etc.). Returns a superset of the old fields: pr, ci (status + verdict), summary, check_runs.',
       inputSchema: {
         type: 'object',
         required: ['repo', 'pr_number'],
@@ -356,83 +265,9 @@ module.exports = {
         },
       },
       handler: async ({ repo, pr_number, head_sha }) => {
-        const pr = await ghFetch(`/repos/${repo}/pulls/${pr_number}`);
-        const sha = head_sha || pr.head?.sha;
-        let runs = [];
-        let commitStatus = null;
-        if (sha) {
-          try {
-            const data = await ghFetch(`/repos/${repo}/commits/${sha}/check-runs?per_page=100`);
-            runs = data.check_runs || [];
-          } catch (e) {
-            if (!String(e.message).includes('404')) throw e;
-          }
-          if (!runs.length) {
-            try { commitStatus = await ghFetch(`/repos/${repo}/commits/${sha}/status`); }
-            catch (e) { if (!String(e.message).includes('404')) throw e; }
-          }
-        }
-        const summary = { total: runs.length, completed: 0, in_progress: 0, queued: 0, pending: 0 };
-        const byConclusion = {};
-        for (const r of runs) {
-          if (r.status === 'completed') summary.completed++;
-          else if (r.status === 'in_progress') { summary.in_progress++; summary.pending++; }
-          else if (r.status === 'queued') { summary.queued++; summary.pending++; }
-          byConclusion[r.conclusion || r.status] = (byConclusion[r.conclusion || r.status] || 0) + 1;
-        }
-        const failed = ['failure', 'action_required', 'timed_out', 'cancelled'].some(c => byConclusion[c]);
-        const pending = summary.pending > 0;
-        const nonBlocking = (byConclusion.skipped || 0) + (byConclusion.neutral || 0);
-        const meaningful = runs.length - nonBlocking;
-        let status;
-        if (!runs.length && commitStatus) {
-          if (!commitStatus.total_count || commitStatus.state === 'no-status') {
-            status = 'no-checks';
-          } else {
-            const cs = commitStatus.state;
-            status = cs === 'success' ? 'success' : (cs === 'pending' ? 'pending' : 'failure');
-          }
-        } else if (!runs.length) {
-          status = 'no-checks';
-        } else if (failed) {
-          status = 'failure';
-        } else if (pending) {
-          status = 'pending';
-        } else if (meaningful > 0 && (byConclusion.success || 0) === meaningful) {
-          status = 'success';
-        } else {
-          status = 'neutral';
-        }
-        return {
-          repo,
-          pr_number,
-          pr: {
-            number: pr.number,
-            title: pr.title,
-            state: pr.state,
-            draft: pr.draft,
-            merged: pr.merged,
-            mergeable: pr.mergeable,
-            head_sha: pr.head?.sha,
-            url: pr.html_url,
-          },
-          ci: {
-            status,
-            check_runs_total: runs.length,
-            check_runs_failed: failed ? Object.keys(byConclusion).filter(c => ['failure', 'action_required', 'timed_out', 'cancelled'].includes(c)).map(c => ({ conclusion: c, count: byConclusion[c] })) : [],
-            commit_status_state: commitStatus?.state,
-          },
-          summary,
-          check_runs: runs.map(r => ({
-            name: r.name,
-            workflow_name: r.app?.name,
-            status: r.status,
-            conclusion: r.conclusion,
-            started_at: r.started_at,
-            completed_at: r.completed_at,
-            details_url: r.html_url,
-          })),
-        };
+        const res = await prStatus(repo, pr_number, { head_sha, include_logs: true, enrich: true });
+        if (!res.ok) throw new Error(res.error.message);
+        return res;
       },
     },
 
