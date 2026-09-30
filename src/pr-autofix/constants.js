@@ -7,7 +7,7 @@
 // The pinned pr-autofix revision is an *immutable* ref. A concrete version tag
 // (vX.Y.Z) or a full commit SHA is accepted; floating refs (main, v1, HEAD,
 // latest) are rejected so an installed job cannot silently drift.
-const DEFAULT_AUTOFIX_REF = 'v1.6.0';
+const DEFAULT_AUTOFIX_REF = 'v1.7.2';
 
 const IMMUTABLE_REF = /^(?:v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?|[0-9a-f]{40})$/;
 

@@ -8,20 +8,32 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { readTokenValue } = require('../../token-value');
+const { tokensRoot } = require('../../data-paths');
+// Credential store (trained-assist-agent#1939): legacy plaintext passes through,
+// an encrypted `github` file is decrypted — a raw readFileSync would hand back
+// base64 garbage once CRED_ENCRYPTION_KEY is provisioned.
+const { readCredentialFile } = require('../../credential-store');
 
 const GH_API = 'https://api.github.com';
 const USER_ID = process.env.USER_ID || '';
+
+function tokenPath(uid) {
+  return path.join(tokensRoot(), uid, 'github');
+}
 
 function getToken() {
   const tok = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   if (tok) return tok;
   if (USER_ID) {
     try {
-      const p = path.join(os.homedir(), 'agent-tokens', USER_ID, 'github');
-      if (fs.existsSync(p)) return readTokenValue(fs.readFileSync(p, 'utf8'));
-    } catch {}
+      const p = tokenPath(USER_ID);
+      if (fs.existsSync(p)) return readTokenValue(readCredentialFile(p));
+    } catch (e) {
+      // Encrypted file without CRED_ENCRYPTION_KEY (or an unreadable one):
+      // never fall back to the base64 stub — degrade to "no token", loudly.
+      if (e && e.code !== 'ENOENT') console.warn('[github] cannot read the token file: %s', e.message);
+    }
   }
   throw new Error(
     'GitHub токен не задан. Вызови github_connect — получишь защищённую ссылку для ввода токена без отправки в чат.'
@@ -51,11 +63,50 @@ async function ghFetch(path, opts = {}) {
   return res.json();
 }
 
+// Same authenticated GET, but the body is TEXT: workflow/job logs are served as
+// plain text (and the browser/agent follows the redirect to a signed URL), so
+// ghFetch's res.json() would throw on them.
+async function ghText(path, opts = {}) {
+  const token = getToken();
+  const url = path.startsWith('http') ? path : `${GH_API}${path}`;
+  const res = await fetch(url, {
+    ...opts,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'trained-assist-agent',
+      ...opts.headers,
+    },
+    signal: opts.signal || AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200) || res.statusText}`);
+  }
+  return res.text();
+}
+
+// Cheap "is a GitHub token available at all?" — reads USER_ID from the
+// environment on every call (the module-level one is captured at load), so a
+// caller can turn "no token" into an explicit contract error instead of
+// letting getToken()'s message leak through.
+function hasToken() {
+  if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
+  const uid = process.env.USER_ID;
+  if (!uid) return false;
+  try { return fs.existsSync(tokenPath(uid)); }
+  catch { return false; }
+}
+
 module.exports = {
+  // Shared GitHub plumbing for the neighbouring tool files (ci_run_branch & co).
+  // The registry only reads `.tools`, so extra exports here are inert.
+  getToken, hasToken, ghFetch, ghText,
   isReady: () => {
     if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
     if (!USER_ID) return false;
-    return fs.existsSync(path.join(os.homedir(), 'agent-tokens', USER_ID, 'github'));
+    return fs.existsSync(tokenPath(USER_ID));
   },
   setupTools: ['github_status'],
 

@@ -21,20 +21,32 @@
 const fs   = require('fs');
 const path = require('path');
 const { readTokenValue } = require('../../token-value');
-const os   = require('os');
 const { spawnSync } = require('child_process');
 const { spawnWorkspaceForTask } = require('../../workspace');
+const { tokensRoot } = require('../../data-paths');
+// Credential store (trained-assist-agent#1939): legacy plaintext passes through,
+// an encrypted `github` file is decrypted — a raw readFileSync would hand back
+// base64 garbage once CRED_ENCRYPTION_KEY is provisioned.
+const { readCredentialFile } = require('../../credential-store');
 
 const USER_ID = process.env.USER_ID || '';
+
+function tokenPath() {
+  return path.join(tokensRoot(), USER_ID, 'github');
+}
 
 function getToken() {
   const tok = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   if (tok) return tok;
   if (USER_ID) {
     try {
-      const p = path.join(os.homedir(), 'agent-tokens', USER_ID, 'github');
-      if (fs.existsSync(p)) return readTokenValue(fs.readFileSync(p, 'utf8'));
-    } catch {}
+      const p = tokenPath();
+      if (fs.existsSync(p)) return readTokenValue(readCredentialFile(p));
+    } catch (e) {
+      // Encrypted file without CRED_ENCRYPTION_KEY (or an unreadable one):
+      // never fall back to the base64 stub — degrade to "no token", loudly.
+      if (e && e.code !== 'ENOENT') console.warn('[dev] cannot read the token file: %s', e.message);
+    }
   }
   throw new Error('GitHub токен не подключён. Вызови connect({ service: "github" }) чтобы получить ссылку для ввода токена.');
 }
@@ -195,10 +207,13 @@ function detectDependencies(wsPath) {
 }
 
 module.exports = {
+  // Shared GitHub plumbing — the registry only reads `.tools`/`.isReady`/
+  // `.setupTools`, so extra exports here are inert (same as 60-github.js).
+  getToken,
   isReady: () => {
     if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
     if (!USER_ID) return false;
-    return fs.existsSync(path.join(os.homedir(), 'agent-tokens', USER_ID, 'github'));
+    return fs.existsSync(tokenPath());
   },
   setupTools: [],
 
