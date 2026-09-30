@@ -297,7 +297,11 @@ try {
       files: { 'manual-tests.yml': MANUAL_YML },
       runs: { 777: run(777, 'success'), 888: run(888, 'failure'), 999: run(999, 'cancelled') },
       dispatchRunId: 777,
-      jobsByRun: { 888: [{ id: 5, name: 'test (unit)', status: 'completed', conclusion: 'failure', html_url: 'https://github.com/owner/repo/actions/runs/888/job/5' }] },
+      jobsByRun: { 888: [
+        { id: 5, name: 'test (unit)', status: 'completed', conclusion: 'failure', html_url: 'https://github.com/owner/repo/actions/runs/888/job/5' },
+        { id: 6, name: 'staging-gate', status: 'completed', conclusion: 'success', html_url: 'https://github.com/owner/repo/actions/runs/888/job/6' },
+        { id: 7, name: 'deploy-gcp', status: 'completed', conclusion: 'skipped', html_url: 'https://github.com/owner/repo/actions/runs/888/job/7' },
+      ] },
       logText: 'ok 1\ntests/broken.test.js\nFAIL tests/broken.test.js — expected 1 === 2\n1 failed, 12 passed',
     });
     globalThis.fetch = g2;
@@ -323,8 +327,12 @@ try {
     const f = await h({ repo: 'owner/repo', run_id: 888 });
     ok(f && f.ok === true && f.conclusion === 'failure',
       `С2.6: красный → conclusion failure (got ${fmt(f)})`);
-    ok(f && Array.isArray(f.failed_jobs) && f.failed_jobs.length > 0,
-      `С2.6: failed_jobs перечислены (got ${fmt(f && f.failed_jobs)})`);
+    // Issue #64 defect 1: the jobs endpoint returns ALL jobs of the run (it has
+    // no status filter), so only conclusion=failure may be reported as failed —
+    // a green staging-gate / skipped deploy there must NOT appear.
+    ok(f && Array.isArray(f.failed_jobs) &&
+       f.failed_jobs.length === 1 && f.failed_jobs[0].name === 'test (unit)',
+      `С2.6: failed_jobs = только упавшие, без success/skipped (got ${fmt(f && f.failed_jobs)})`);
     ok(f && /FAIL tests\/broken\.test\.js/.test(String(f.log_tail || '')),
       `С2.6: log_tail содержит упавший тест (got ${String((f && f.log_tail) || '').slice(0, 80)})`);
 

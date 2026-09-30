@@ -31,7 +31,7 @@ const register = {
         },
         additionalProperties: false,
       },
-      autofix_ref: { type: 'string', description: 'Pinned pr-autofix revision/tag. Defaults to an immutable tag ("v1.6.0").' },
+      autofix_ref: { type: 'string', description: 'Pinned pr-autofix revision/tag. Defaults to an immutable tag ("v1.7.2").' },
       ci_workflow_name: { type: 'string', description: 'name: of the target repo CI workflow the installed workflow_run trigger watches. Defaults to "CI".' },
       capabilities: {
         type: 'object',

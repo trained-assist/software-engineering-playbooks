@@ -88,9 +88,10 @@ Design: `docs/spec-generation-migration.md` (proposal, slices S1–S5, запу�
 
 ## Definition of done
 
-- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/54
-- [ ] Merged to main
-- [ ] Deployed to prod — verified live
+- [x] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/54
+- [x] Merged to main (9c0552f; + фикс #65 aea7f83)
+- [x] Deployed to prod — verified live (оба плейбука в `playbook_list`, живой прогон зелёный+красный,
+      прогон не деплоит; первый репозиторий `trained-assist-agent` настроен, PR #1864)
 
 ## Checklist — skill-tool: новый MCP-инструмент в скиле (issue #53, plan-aa96d610)
 

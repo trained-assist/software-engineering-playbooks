@@ -13,8 +13,12 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { readTokenValue } = require('../token-value');
+const { tokensRoot } = require('../data-paths');
+// Credential store (trained-assist-agent#1939): legacy plaintext passes through,
+// an encrypted `github` file is decrypted — a raw readFileSync would hand back
+// base64 garbage once CRED_ENCRYPTION_KEY is provisioned.
+const { readCredentialFile } = require('../credential-store');
 
 const GH_API = 'https://api.github.com';
 const USER_ID = process.env.USER_ID || '';
@@ -29,7 +33,7 @@ class GitHubApiError extends Error {
 }
 
 function tokenFilePath() {
-  return USER_ID ? path.join(os.homedir(), 'agent-tokens', USER_ID, 'github') : null;
+  return USER_ID ? path.join(tokensRoot(), USER_ID, 'github') : null;
 }
 
 function hasToken() {
@@ -45,8 +49,12 @@ function getToken() {
   const p = tokenFilePath();
   if (p) {
     try {
-      if (fs.existsSync(p)) return readTokenValue(fs.readFileSync(p, 'utf8'));
-    } catch { /* fall through to the error below */ }
+      if (fs.existsSync(p)) return readTokenValue(readCredentialFile(p));
+    } catch (e) {
+      // Encrypted file without CRED_ENCRYPTION_KEY (or an unreadable one):
+      // never fall back to the base64 stub — degrade to "no token", loudly.
+      if (e && e.code !== 'ENOENT') console.warn('[github] cannot read the token file: %s', e.message);
+    }
   }
   throw new GitHubApiError(
     'GitHub токен не задан. Вызови github_connect — получишь защищённую ссылку для ввода токена без отправки в чат.',
