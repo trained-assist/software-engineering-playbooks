@@ -60,8 +60,45 @@ non-goal.
   correctness dependency.
 - `engineering_repo_context(keywords)` queries the index when fresh, otherwise
   uses the deterministic raw keyword ranking. No network, no LLM.
+- `repo_map(repo, level, focus)` (`src/repo-map/`, issue #49) renders the
+  compressed map (L0) and the skeleton (L1) on top of the same index. Call it
+  before any broad search.
+
+## Shared cache (repo-map)
+
+Derived data does not belong inside a working tree: two checkouts of one commit
+would each build their own copy, and every worktree would carry untracked
+build output. The index and the maps therefore live together, keyed by commit:
+
+```text
+<workspacesRoot>/repo-maps/<repoId>/
+  descriptions.json          # LLM one-liners, cached by module content hash
+  <sha>/
+    index/                   # the v1 index, same schema, different location
+    map-l0.json              # rendered L0 map
+    map-l1.json is rendered on read from index/ (focus is per call)
+```
+
+`<workspacesRoot>` is `ENGINEERING_WORKSPACE_ROOT`, else
+`~/agent-data/engineering-workspaces` — the same root the workspaces and
+mirrors use. Retention keeps the last 10 commits per repository; a per-sha lock
+(`<sha>.lock`) makes concurrent builders (spawn hook + first `repo_map`)
+produce exactly one map.
+
+`resolveIndexRoot()` (in `src/repo-map/paths.js`) is the single seam every
+reader goes through: a checkout that owns a legacy `.engineering/index` keeps
+using it, a fresh worktree resolves the shared per-sha copy. Readers and
+writers agree by construction, so a worktree with no local index still gets
+`indexed-repo` context instead of silently falling back to raw.
+
+Writers are `repo_map` itself (`buildMap`) and the workspace spawn hook
+(`src/workspace/for-task.js`, fire-and-forget, `REPO_MAP_SPAWN_BUILD=0` turns
+it off). A commit merged in main is picked up lazily: the first spawn or first
+`repo_map` at the new sha builds it, no webhook.
 
 ## Contract
 
 Indexing is an optimization, never a required correctness dependency. Raw
-repository discovery remains the fallback forever.
+repository discovery remains the fallback forever. The same holds for maps:
+`repo_map` never answers empty, never serves a map for a commit other than the
+one checked out, and any failure tells the caller to read the repository.

@@ -50,9 +50,11 @@ function flagsBlock(library) {
   return [`${f.title}:`, ...f.levels.map(l => `  • ${l}`), `  Правило: ${f.rule}`].join('\n');
 }
 
-function renderInstructions(library, typeId, type, notes) {
+// `context` replaces the default «Репозиторий: {repo}» line for playbooks whose
+// steps work across repositories (epic-delivery: the architecture repo + an epic).
+function renderInstructions(library, typeId, type, notes, context = REPO_LINE) {
   const parts = [`Тип шага: ${typeId} — ${type.purpose}`];
-  if (type.execution_kind === 'agent') parts.push(REPO_LINE);
+  if (type.execution_kind === 'agent') parts.push(context);
   parts.push([
     type.execution_kind === 'agent'
       ? 'Чек-лист (пройди все пункты за этот ран; в ИТОГЕ ШАГА коротко отметь каждый: ✅ сделано / ⏭ не нужно — почему):'
@@ -69,7 +71,7 @@ function renderInstructions(library, typeId, type, notes) {
 const STEP_OVERRIDES = ['title', 'validation', 'executor_role', 'minimum_model_level', 'context_budget',
   'execution_timeout_seconds', 'max_attempts', 'delay_after_sec', 'wait', 'on_complete', 'on_fail'];
 
-function buildStep(library, src, playbookNotes, where) {
+function buildStep(library, src, context, where) {
   const type = library.types[src.use];
   if (!type) throw new Error(`${where}: unknown step type "${src.use}"`);
   const merged = { ...type };
@@ -78,7 +80,7 @@ function buildStep(library, src, playbookNotes, where) {
   const step = {
     title: merged.title,
     step_type: src.use,
-    instructions: renderInstructions(library, src.use, type, notes),
+    instructions: renderInstructions(library, src.use, type, notes, context),
     execution_kind: merged.execution_kind,
   };
   if (merged.execution_kind === 'agent') {
@@ -101,13 +103,16 @@ function buildPlaybook(library, src) {
     title: src.title,
     goal_template: src.goal_template,
   };
+  if (src.when_to_use) out.when_to_use = src.when_to_use;
+  if (src.requires) out.requires = src.requires;
   if (src.user_value_template) out.user_value_template = src.user_value_template;
   if (src.defaults) out.defaults = src.defaults;
+  if (src.inputs) out.inputs = src.inputs;
   out.stages = src.stages.map(stage => {
     const built = { id: stage.id, title: stage.title };
     if (stage.on_enter) built.on_enter = stage.on_enter;
     if (stage.on_exit) built.on_exit = stage.on_exit;
-    built.steps = stage.steps.map((s, i) => buildStep(library, s, src.notes || [], `${src.id}/${stage.id}[${i}]`));
+    built.steps = stage.steps.map((s, i) => buildStep(library, s, src.context || REPO_LINE, `${src.id}/${stage.id}[${i}]`));
     return built;
   });
   // Playbook-wide notes go to the first agent step, where the run starts.
@@ -122,12 +127,16 @@ function buildPlaybook(library, src) {
 // ── human-readable docs ──────────────────────────────────────────────────────
 
 const LEVEL_NOTE = { bachelor: 'дешёвая модель', master: 'сильная дешёвая', doctor: 'Claude (дорого)' };
+// reviewer + doctor is the independent cross-review: a different model family than
+// the Claude builder (Codex, fallback OpenCode doctor — never Claude).
+const levelNote = step => (step.executor_role === 'reviewer' && step.minimum_model_level === 'doctor'
+  ? 'Codex — другая семья моделей, не Claude' : LEVEL_NOTE[step.minimum_model_level]);
 
 function contractCell(step) {
   if (step.execution_kind === 'programmatic') {
     return `программно${step.wait ? `, ждёт (опрос ${step.wait.poll_every_sec / 60} мин, таймаут ${Math.round(step.wait.timeout_sec / 3600)} ч)` : ''}`;
   }
-  return `${step.executor_role} · ${step.minimum_model_level} (${LEVEL_NOTE[step.minimum_model_level]}) · ${step.context_budget}`;
+  return `${step.executor_role} · ${step.minimum_model_level} (${levelNote(step)}) · ${step.context_budget}`;
 }
 
 function renderPlaybookDoc(library, src, built) {
@@ -142,7 +151,7 @@ function renderPlaybookDoc(library, src, built) {
     '',
   ];
   if (src.notes && src.notes.length) lines.push(...src.notes.map(n => `- ${n}`), '');
-  lines.push('**Запуск:** `playbook_run(playbook_id: "' + built.id + '", goal: "<что делаем>", vars: {repo: "<owner/repo>"})` → черновик плана → `task_update(status: "active")`.', '');
+  lines.push('**Запуск:** `playbook_run(playbook_id: "' + built.id + '", goal: "<что делаем>", vars: ' + (src.run_vars || '{repo: "<owner/repo>"}') + ')` → черновик плана → `task_update(status: "active")`.', '');
   let n = 0;
   lines.push('| # | Стадия | Шаг | Тип | Исполнитель | Проверка |', '|---|---|---|---|---|---|');
   for (const stage of built.stages) {
