@@ -61,6 +61,28 @@ itself was judged genuinely earned complexity and is untouched.
 - [реализовано] Optional host override of workspace/mirror roots via
   `ENGINEERING_WORKSPACE_ROOT` / `ENGINEERING_MIRRORS_ROOT` (defaults to `~/agent-data/...`); needed
   so tests stay hermetic, and lets a host place workspaces outside the default home.
+- [реализовано] Resume after the base branch moved (2026-09-27): a repeat
+  `engineering_spawn_workspace` with the same `root_task_id` returns the existing `code_ready`
+  workspace before refreshing the mirror. Before, the re-resolved `baseRevision` changed the
+  operation fingerprint and a legitimate resume failed with `CONFLICT` ("idempotency key was
+  already used with incompatible arguments") — seen on the VM, 1 of 11 real calls on 2026-09-27.
+- [планируется] The operation key is the bare `root_task_id`, global across principals and
+  repositories: the same label for a different repo/profile gets `CONFLICT` (safe, never another
+  task's workspace, but blocks the call). Not hit on the VM so far.
+
+## Engineering tools moved from trained-assist-agent core (trained-assist-agent#1631, 2026-09-27)
+
+- [реализовано] `60-github` (github_*), `61-dev` (dev_workspace_setup / dev_new_repo /
+  dev_supersede_pr), `63-ci-cd` (cicd_track_pr) served by this repo's `engineering-skills` MCP
+  server; core deletes its copies. Tool names unchanged.
+- [реализовано] `dev_workspace_setup` calls `spawnWorkspaceForTask` in-repo — core's
+  `engineeringLibPath()` / `ENGINEERING_WORKSPACE_LIB` path into the sibling is gone.
+- [реализовано] Core couplings cut: `token-value.js` mirrored; git hooks copied to
+  `templates/githooks/`; `cicd_track_pr` only needs the `checklist.md` filename (the GTD
+  controller in core scans it).
+- [реализовано] Registry: auto-discovers `tools/*.js`, supports core-shaped modules
+  (`isReady`/`setupTools`), `listAllTools()` for core's headless transport, `SKILLS_RESOLVED` filter.
+- [реализовано] Prompt domains `engineering`, `github.setup` live in `src/prompt-domains/`.
 
 ## Repository indexer v1 + engineering_repo_context + QA logs (issue #11)
 
@@ -164,3 +186,69 @@ Design: `docs/PR-AUTOFIX-SERVICE.md` §3. Additive; external write = a PR to the
 - [планируется] Сжатый индекс репозитория для мини-ресерча в `define-use-case`.
 - [планируется] Hermes-авторинг (`playbook_draft`) не знает про `wait` / `step_type`.
 - [планируется] Переименовать sibling-чекаут на VM под новое имя репозитория.
+
+## Скилл расчёта сложности: сложность → цена (2026-09-28, issue #41)
+
+- [реализовано] Детерминированный движок `src/complexity/index.js` (commonjs, 0 deps, без I/O):
+  **база = стоимость одного рабочего дня** `baseDayRub`(15000) × `tierDays`{T0:0.5, T1:1.0} × K —
+  все коэффициенты = увеличители этого дня; всегда три цены (демпинг ×1, коммерческая ×2,
+  хорошая ×2,5); observability-ось первична (закрытый API и закрытая инфраструктура —
+  независимые ×3, перемножаются), «вширь» маленькая (1.0 / 1.3 / 1.4), остальные K — как в v3;
+  все числа только в объекте `CONFIG` (правка числа ≠ правка логики); warnings: K≥5 (правило
+  остановки), неизвестные поля/тир. Директива 2 от 28.09.2026 19:28 МСК.
+- [реализовано] MCP-тул `engineering_estimate_complexity` (`src/mcp-skills/tools/64-complexity.js`,
+  авто-обнаружение реестра, без правок `registry.js`); пустой вход → рабочий результат (тир T0
+  + warning); `node --check` добавлен в `scripts.check`.
+- [реализовано] Тесты-спецификация `tests/complexity-engine.test.js` (18 фикс-кейсов; числа
+  базы/тирей выводятся из `CONFIG`, литралы — в одном пин-тесте) + сквозной сценарий
+  `tests/complexity-tool.test.js` (6 кейсов через `registry.callTool`).
+- [реализовано] Док модели `docs/complexity-estimation.md`: формула «день × K», ось
+  observability, правило K≥5, связка со SbDD (уровень S = время петли = цена/риск, §5), честные
+  open questions v3 (нет фактора объёма; перелёт на пересечении — Renovatio 820k против 241k;
+  «закрытые IP» → закрытые API; внешние системы выпали из «вширь»; «сумма, опирающаяся на
+  юзера» — механика не задана, в модель не внесена), разводка с флагами ⚪🟢🟡🔴⚫ (это про
+  состояния фичи, не про цену), точка интеграции со спецификацией.
+- [планируется] Подключение `trained-assist-freelance-skill` — спецификация использует оценку
+  вторично; отдельный следующий PR.
+- [отклонено (non-goals)] Риск-скоринг GO/NO-GO и генерация ТЗ не трогаются; множители «без
+  CTO» (нет данных ×1,2–1,3, регулируемые ×1,2) зарезервированы в доке, в движок не заведены;
+  экспозиция в `provider-manifest.json` отложена (паритет с соседями-тулами).
+
+## Прогон тестов в облаке: `ci-setup` + `ci-run` (2026-09-29, issue #51, план 3e40a139)
+
+- [реализовано] Плейбук `ci-setup` (разовый, на репозиторий): стадии analyze → change → explain,
+  стек и workflow репозитория разбираются сами, идемпотентность наблюдаема — настроенное репо
+  отвечает «уже настроено» и PR не открывает; правка идёт PR-ом в целевой репо, штатными
+  open-pr / ci-green / merged; последний шаг объясняет владельцу простыми словами, что появилось
+  и что запуск ничего не сливает и не выкатывает.
+- [реализовано] Плейбук `ci-run` (частый, на ветку): один MCP-тул `ci_run_branch` (без run_id —
+  диспатч и поиск своего рана, с run_id — статус, упавшие джобы, хвост лога), ожидание только
+  через `task_item_wait(until: {ci_run_green: …})` и `DURABLE: waiting`, ненастроенное репо →
+  явный `configured:false` с предложением `ci-setup`.
+- [реализовано] Типы шагов `ci-setup` и `ci-run` в `library/step-types.json` (24 → 25);
+  общий `verify-local` переписан: локально — только быстрые проверки, полный набор — в облаке
+  (`ci_run_branch` + durable-ожидание), с фолбэком на локальный прогон для ненастроенного репо.
+- [реализовано] Шаблон `templates/ci.yml`: `workflow_dispatch` с input ref/suite, своя
+  `concurrency`-группа только на ручные запуски, примеры команд для python/go в шапке; в нём
+  нет `continue-on-error` и нет шагов сливания/выкатки (это проверяет песочница).
+- [реализовано] В ядре `trained-assist-agent` (PR-A, отдельная ветка): детерминированный
+  валидатор `ci_run_green` в `createDefaultRegistry` — `task_item_wait` принимает этот ключ
+  условия; completed+success → pass, completed+не-success → fail с `evidence.final:true`
+  (будит сразу), идёт/нет токена/ API недоступен → inconclusive; unit-тест рядом с `ci_green`.
+- [реализовано] Песочница `npm run test:sandbox:ci` (S5, ~0.3 с): фейковый GitHub API,
+  48 проверок по шагам сценария; откат — revert обоих PR (репозитории независимы).
+- [отклонено (почему)] Диспатч в чужой `ci.yml` по умолчанию не добавляется — только отдельный
+  `manual-tests.yml`; правка существующего workflow разрешена лишь когда все тяжёлые джобы и так
+  привязаны к `push`/`pull_request`, иначе ручной запуск мог бы задеплоить (риск R1).
+- [отклонено (почему)] Новых моделей доступа для GitHub нет: права берутся от существующего
+  per-user токена, его нехватка — явная ошибка, а не обходной путь.
+- [реализовано] Первое применение `ci-setup` — `trained-assist-agent`: у его `.github/workflows/ci.yml`
+  добавлен `workflow_dispatch` с input `ref` (PR #1864), тяжёлые джобы (`merge`, `deploy-gcp`,
+  `deploy-ru`) остаются на `pull_request`/push-main, поэтому ручной прогон их не запускает.
+  Повторный `ci-setup` отвечает «уже настроено».
+- [реализовано] Два дефекта живого тула, найденные на реальной проверке сценария, закрыты
+  (issue #64 → PR #65): (1) `failed_jobs` теперь содержит только джобы с `conclusion=failure`
+  (раньше попадали `success`/`skipped`); (2) «свой» ран ищется по снимку до диспатча, а не по
+  окну «свежайший за 60 с» — два близких диспатча получают разные run id, не чужой результат.
+- [планируется] Пачка `ci-setup` на остальные репозитории org `trained-assist` — issue #66
+  (первый репозиторий настроен и проверен).

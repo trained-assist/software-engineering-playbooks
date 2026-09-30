@@ -6,21 +6,30 @@ Reusable software-engineering control plane for the `trained-assist` ecosystem.
 
 This repository exists to make coding agents **faster, safer and easier to coordinate** across many repositories and many concurrent tasks.
 
-## Engineering playbooks — `feature`, `debugging`, `new-software`
+## Engineering playbooks — `feature`, `debugging`, `new-software`, `ci-setup`, `ci-run`, `skill-tool`, `epic-delivery`
 
-Three executable processes the agent runs as durable plans (sandbox-driven development:
+Seven executable processes the agent runs as durable plans (sandbox-driven development:
 first an executable loop that reproduces the user scenario, then the code that passes it).
+The first three are change-flow (sandboxes, PR, deploy, archive); the last two are the
+«прогон тестов в облаке» pair — short operational playbooks with no change-flow. `epic-delivery` is a meta
+loop over the others: it runs one change-flow child plan per card of an architecture plan.
 
 | Playbook | When | Readable version |
 |---|---|---|
 | `feature` | most common: a feature or change in an existing product | [docs/playbooks/feature.md](docs/playbooks/feature.md) |
 | `debugging` | a bug, regression or error in the logs | [docs/playbooks/debugging.md](docs/playbooks/debugging.md) |
 | `new-software` | a new module/service from scratch (Playbook Zero) | [docs/playbooks/new-software.md](docs/playbooks/new-software.md) |
+| `ci-setup` | once per repository: give it a manual "run the full test suite for this branch" workflow (idempotent — a second run says «уже настроено») | [docs/playbooks/ci-setup.md](docs/playbooks/ci-setup.md) |
+| `ci-run` | often, per branch: dispatch that run and get green/red + failed jobs + log tail, waiting durably instead of locally | [docs/playbooks/ci-run.md](docs/playbooks/ci-run.md) |
+| `skill-tool` | a new MCP tool in an existing domain skill: conventions → file + schema → executable test → PR/CI/staging → delivery → live call | [docs/playbooks/skill-tool.md](docs/playbooks/skill-tool.md) |
+| `epic-delivery` | «довести эпик/план архитектуры до конца» autonomously: per card a child plan with a sandbox (new-software / feature / debugging) → independent cross-review by a different model family (reviewer · doctor = Codex) → plan update PR → next card (loop via `task_item_add`), then acceptance against the checklist | [docs/playbooks/epic-delivery.md](docs/playbooks/epic-delivery.md) |
 
 - **Design, industry mapping (OpenSpec, Spec Kit, Kiro/EARS, Shape Up, Temporal…), ladders and flags:**
   [docs/engineering-playbooks-design-sandbox-driven-development-and-industry-mapping.md](docs/engineering-playbooks-design-sandbox-driven-development-and-industry-mapping.md)
-- **Typed step library** (24 step types, sub-steps, V/R/S ladders, ⚪🟢🟡🔴⚫ flags): `library/step-types.json` →
+- **Typed step library** (32 step types, sub-steps, V/R/S ladders, ⚪🟢🟡🔴⚫ flags): `library/step-types.json` →
   [docs/playbooks/step-library.md](docs/playbooks/step-library.md)
+- **Cloud test run design** (`ci-setup` + `ci-run`, slices, risks, rollback): [docs/ci-cloud-run.md](docs/ci-cloud-run.md);
+  scenario: [docs/user-scenarios/ci/cloud-test-run.md](docs/user-scenarios/ci/cloud-test-run.md)
 
 How it fits together:
 
@@ -809,6 +818,10 @@ A roadmap item is not considered implemented merely because it exists in this RE
 ```text
 src/
   prepare-task.js
+  github/
+    client.js           # shared token + REST/GraphQL fetch for github_* / dev_* / pr_status
+    compress-log.js     # vendored compressLog from pr-autofix (failed-job log tail compaction)
+    pr-status-core.js   # pr_status / issue_status engine (checks, verdict, autofix, prod, budget)
   workspace/
     workspace.js        # spawn/status/release/reconcile
     git.js
@@ -829,14 +842,29 @@ src/
   pr-autofix/
     registry.js         # per-profile pr-autofix registration store + state machine
   mcp-skills/
+    registry.js         # tools/*.js auto-discovery; core-shaped modules gated by isReady()/setupTools,
+                        # SKILLS_RESOLVED hides 'engineering-skills/<file>' of switched-off sections
+    tools/              # 10–50 engineering-native; 60-github, 61-dev, 63-ci-cd moved from
+                        # trained-assist-agent core (#1631): github_*, dev_*, cicd_track_pr;
+                        # 62-pr-status: pr_status / issue_status (github_pr_checks stays as a
+                        # throwing alias of pr_status);
+                        # 63-ci-cd also ci_run_branch (dispatch a branch's test run + status);
+                        # 64-complexity: engineering_estimate_complexity (complexity → price)
+  complexity/
+    index.js            # deterministic complexity→price engine (base working day × tier-days × multipliers, 3 prices)
+  prompt-domains/       # engineering.md, github.setup.md — read by core's prompt-domains loader
+  token-value.js        # mirror of trained-assist-agent src/token-value.js (agent-tokens readers)
+
+templates/githooks/     # pre-commit / pre-push installed by dev_workspace_setup
+templates/ci.yml        # manual test-run workflow for a repo without one (ci-setup drops it in)
 
 contracts/              # incl. playbook.schema.json (vendored Playbook v1)
 library/                # step-types.json — typed step library (sub-steps, ladders, flags)
-playbooks-src/          # feature / debugging / new-software sources
+playbooks-src/          # feature / debugging / new-software / ci-setup / ci-run / skill-tool / epic-delivery sources
 playbooks/              # built Playbook v1 JSON (+ prose procedures prepare-task, connect-github)
 docs/                   # docs/playbooks/*.md — generated readable playbooks
 examples/
-scripts/                # index-repo.js, manifest-check.js
+scripts/                # index-repo.js, manifest-check.js, sandbox/ (incl. ci-cloud-run.mjs loop)
 ```
 
 Expected future top-level capability areas include workspace management, verification, scheduler/admission, repository intelligence and engineering memory.

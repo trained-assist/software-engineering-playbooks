@@ -23,10 +23,23 @@ const os = require('os');
 const path = require('path');
 const git = require('./git');
 const { fail } = require('./errors');
-const { spawnWorkspace, statusWorkspace, releaseWorkspace, ownerKeyOf, workspaceIdOf } = require('./workspace');
+const { spawnWorkspace, statusWorkspace, releaseWorkspace, ownerKeyOf, workspaceIdOf, CODE_READY } = require('./workspace');
+const { buildMap, mapStatus } = require('../repo-map');
 
 const DEFAULT_WORKSPACE_ROOT = path.join(os.homedir(), 'agent-data', 'engineering-workspaces');
 const DEFAULT_MIRRORS_ROOT = path.join(os.homedir(), 'agent-data', 'engineering-mirrors');
+
+// Background map build for the commit this workspace was just created at.
+// Fire-and-forget on purpose: spawn must never wait for it (scenario step 1)
+// and never fail because of it — a map is an optimisation, raw reading always
+// works. REPO_MAP_SPAWN_BUILD=0 is the kill-switch: no redeploy, no rollback.
+function spawnMapBuild({ codePath, workspaceRoot }) {
+  if (process.env.REPO_MAP_SPAWN_BUILD === '0') return;
+  buildMap({ repoPath: codePath, workspacesRoot: workspaceRoot }).then(
+    (result) => console.error(`[repo-map] ${result.status} ${String(result.sha).slice(0, 8)} for ${path.basename(codePath)}`),
+    (error) => console.error(`[repo-map] spawn build skipped: ${(error && error.message) || error}`),
+  );
+}
 
 // One local mirror per repository, shared across principals/tasks — never a
 // task's own working directory, only the thing git worktree forks from. Clone
@@ -70,6 +83,17 @@ function spawnWorkspaceForTask({
 } = {}) {
   requireTaskFields({ principal, repositoryUrl, rootTaskId });
 
+  // Resume: a task that already has a ready workspace gets it back as-is,
+  // before the mirror is refreshed. The base branch has usually moved since
+  // the first spawn, and a re-resolved baseRevision changes the operation
+  // fingerprint — spawnWorkspace() would then reject a legitimate resume as
+  // "idempotency key was already used with incompatible arguments".
+  if (fs.existsSync(workspaceRoot)) {
+    const workspaceId = taskWorkspaceId({ principal, repositoryUrl, repositoryId, rootTaskId });
+    const existing = statusWorkspace({ workspaceRoot, workspaceId, principal, rootTaskId });
+    if (existing.found && existing.status === CODE_READY) return { ...existing, reused: true, recovered: false };
+  }
+
   const sourceCheckout = ensureMirror(repositoryUrl, mirrorsRoot);
   const baseRevision = resolveBaseRevision(sourceCheckout, ref);
   if (!baseRevision) fail('UNKNOWN_REVISION', `cannot resolve ${ref || 'the default branch'} in mirror`, { sourceCheckout, repositoryUrl });
@@ -84,6 +108,10 @@ function spawnWorkspaceForTask({
     rootTaskId,
     idempotencyKey: rootTaskId,
     allowFetch: true,
+  }, {
+    hooks: {
+      afterSpawn: ({ codePath }) => spawnMapBuild({ codePath, workspaceRoot }),
+    },
   });
 }
 
@@ -95,7 +123,13 @@ function taskWorkspaceId({ principal, repositoryUrl, repositoryId, rootTaskId })
 
 function statusWorkspaceForTask({ principal, repositoryUrl, repositoryId, rootTaskId, workspaceRoot = DEFAULT_WORKSPACE_ROOT } = {}) {
   const workspaceId = taskWorkspaceId({ principal, repositoryUrl, repositoryId, rootTaskId });
-  return statusWorkspace({ workspaceRoot, workspaceId, principal, rootTaskId });
+  const status = statusWorkspace({ workspaceRoot, workspaceId, principal, rootTaskId });
+  // Report whether the map for this workspace's commit exists yet (scenario
+  // step 1). Read-only: status never triggers a build.
+  if (status && status.codePath && status.status === CODE_READY) {
+    status.repoMap = mapStatus({ repoPath: status.codePath, workspacesRoot: workspaceRoot });
+  }
+  return status;
 }
 
 function releaseWorkspaceForTask({
