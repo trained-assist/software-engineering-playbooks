@@ -8,20 +8,32 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { readTokenValue } = require('../../token-value');
+const { tokensRoot } = require('../../data-paths');
+// Credential store (trained-assist-agent#1939): legacy plaintext passes through,
+// an encrypted `github` file is decrypted — a raw readFileSync would hand back
+// base64 garbage once CRED_ENCRYPTION_KEY is provisioned.
+const { readCredentialFile } = require('../../credential-store');
 
 const GH_API = 'https://api.github.com';
 const USER_ID = process.env.USER_ID || '';
+
+function tokenPath(uid) {
+  return path.join(tokensRoot(), uid, 'github');
+}
 
 function getToken() {
   const tok = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   if (tok) return tok;
   if (USER_ID) {
     try {
-      const p = path.join(os.homedir(), 'agent-tokens', USER_ID, 'github');
-      if (fs.existsSync(p)) return readTokenValue(fs.readFileSync(p, 'utf8'));
-    } catch {}
+      const p = tokenPath(USER_ID);
+      if (fs.existsSync(p)) return readTokenValue(readCredentialFile(p));
+    } catch (e) {
+      // Encrypted file without CRED_ENCRYPTION_KEY (or an unreadable one):
+      // never fall back to the base64 stub — degrade to "no token", loudly.
+      if (e && e.code !== 'ENOENT') console.warn('[github] cannot read the token file: %s', e.message);
+    }
   }
   throw new Error(
     'GitHub токен не задан. Вызови github_connect — получишь защищённую ссылку для ввода токена без отправки в чат.'
@@ -83,7 +95,7 @@ function hasToken() {
   if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
   const uid = process.env.USER_ID;
   if (!uid) return false;
-  try { return fs.existsSync(path.join(os.homedir(), 'agent-tokens', uid, 'github')); }
+  try { return fs.existsSync(tokenPath(uid)); }
   catch { return false; }
 }
 
@@ -94,7 +106,7 @@ module.exports = {
   isReady: () => {
     if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
     if (!USER_ID) return false;
-    return fs.existsSync(path.join(os.homedir(), 'agent-tokens', USER_ID, 'github'));
+    return fs.existsSync(tokenPath(USER_ID));
   },
   setupTools: ['github_status'],
 
