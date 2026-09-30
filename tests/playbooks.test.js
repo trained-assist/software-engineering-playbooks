@@ -226,5 +226,24 @@ test('epic-delivery: loop steps are idempotent across re-runs (markers, adoption
   assert.match(text['loop-or-finish'], /ТОЛЬКО недостающие/);
   // final acceptance: section by section with a continuation
   assert.match(text['final-acceptance'], /\[epic-acceptance <meta id> section/);
-  assert.match(text['final-acceptance'], /« — продолжение»/);
+  assert.match(text['final-acceptance'], /« — продолжение»/);});
+
+test('epic-delivery v3: statuses and checklists live in the GitHub Project and card issues, docs only durable', () => {
+  const pb = built.find(b => b.id === 'epic-delivery');
+  assert.ok(pb.version >= 3);
+  const inputs = Object.fromEntries(pb.inputs.map(i => [i.name, i]));
+  assert.equal(inputs.project.required, false, 'project input is optional with a default');
+  assert.equal(inputs.acceptance_doc.required, false, 'acceptance_doc kept for back-compat');
+  const text = Object.fromEntries(steps(pb).map(s => [s.step_type, s.instructions]));
+  for (const [type, t] of Object.entries(text)) {
+    if (type === 'archive') continue;
+    assert.match(t, /GitHub Project: \{project\}/, `${type}: context names the Project`);
+    assert.match(t, /gh project item-list/, `${type}: statuses from the Project`);
+    assert.match(t, /не переписывай и не изобретай заново/, `${type}: reuse a ready card issue`);
+  }
+  assert.match(text['next-card'], /«In progress»/);
+  assert.match(text['child-plan'], /Refs <URL issue карточки>/);
+  assert.match(text['architecture-update'], /PR не нужен/);
+  assert.match(text['architecture-update'], /«Done»/);
+  assert.match(text['final-acceptance'], /Раздел = эпик стадии/);
 });
