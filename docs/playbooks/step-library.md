@@ -32,12 +32,12 @@ Typed step library for the engineering playbooks. One step type = one reusable u
 | `go-live` | Из песочницы в реальное окружение | apply (deliver) | developer · master | `running_in_real_environment` | new-software |
 | `archive` | Архивация: обновить живые доки и закрыть план | archive (слить spec delta в живые спеки) | reviewer · bachelor | `living_docs_updated_and_plan_closed` | debugging, epic-delivery, feature, new-software, skill-tool |
 | `epic-preflight` | Предполётная проверка эпика и журнал итераций | — (мета-цикл над планом: подготовка) | developer · doctor | `epic_preflight_passed_and_ledger_written` | epic-delivery |
-| `next-card` | Следующая карточка плана | — (мета-цикл: выбор среза) | developer · doctor | `next_card_chosen_or_all_closed_recorded` | epic-delivery |
-| `child-plan` | Дочерний инженерный план карточки | — (мета-цикл: делегирование apply) | developer · master | `child_plan_ran_to_end_and_outcome_recorded` | epic-delivery |
-| `cross-review` | Независимое кросс-ревью (другая семья моделей) | — (независимое ревью / verify) | reviewer · doctor | `independent_review_verdict_published` | epic-delivery |
-| `architecture-update` | Обновление плана архитектуры по итогам ревью | archive (для плана архитектуры) | developer · doctor | `plan_updated_from_review, pr_merged` | epic-delivery |
-| `loop-or-finish` | Цикл или финиш | — (мета-цикл: повтор) | developer · master | `next_iteration_added_or_loop_finished` | epic-delivery |
-| `final-acceptance` | Финальная приёмка по чек-листу | verify (приёмка эпика) | verifier · doctor | `acceptance_checklist_run_and_report_published` | epic-delivery |
+| `next-card` | Следующая карточка плана | — (мета-цикл: выбор среза) | developer · doctor | `iteration_card_recorded_once_with_marker` | epic-delivery |
+| `child-plan` | Дочерний инженерный план карточки | — (мета-цикл: делегирование apply) | developer · master | `child_plan_of_this_iteration_terminal_or_deadline_and_outcome_recorded` | epic-delivery |
+| `cross-review` | Независимое кросс-ревью (другая семья моделей) | — (независимое ревью / verify) | reviewer · doctor | `verdict_for_this_iteration_child_published_or_continuation_added` | epic-delivery |
+| `architecture-update` | Обновление плана архитектуры по итогам ревью | archive (для плана архитектуры) | developer · doctor | `plan_updated_from_this_iteration_child_verdict, pr_merged` | epic-delivery |
+| `loop-or-finish` | Цикл или финиш | — (мета-цикл: повтор) | developer · master | `next_iteration_complete_in_order_or_loop_finished` | epic-delivery |
+| `final-acceptance` | Финальная приёмка по чек-листу | verify (приёмка эпика) | verifier · doctor | `acceptance_checklist_run_and_report_published_or_continuation_added` | epic-delivery |
 
 ## Лестницы
 

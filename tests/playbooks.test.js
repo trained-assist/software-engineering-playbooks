@@ -172,7 +172,7 @@ test('epic-delivery: meta loop card → child plan → independent review → pl
   assert.match(byType['child-plan'].instructions, /task_item_wait\(until: \{task_done:/);
   // there is no repeat construct: the loop is a legal self-edit after the step's own item
   assert.match(byType['loop-or-finish'].instructions, /task_item_add/);
-  assert.match(byType['loop-or-finish'].instructions, /after_item_id = id ЭТОГО пункта/);
+  assert.match(byType['loop-or-finish'].instructions, /id ЭТОГО пункта/);
   assert.ok(byType['architecture-update'].validation.pr_merged, 'plan update is merged, not just proposed');
   const inputs = Object.fromEntries(pb.inputs.map(i => [i.name, i]));
   assert.notEqual(inputs.epic.required, false, 'epic is required');
@@ -184,4 +184,35 @@ test('epic-delivery: meta loop card → child plan → independent review → pl
 test('schema: when_to_use / requires are declared (in sync with trained-assist-agent)', () => {
   assert.ok(schema.properties.when_to_use && schema.properties.requires);
   assert.deepEqual(schema.$defs.step.properties.executor_role.enum, [...EXECUTOR_ROLES, null]);
+});
+
+test('epic-delivery: loop steps are idempotent across re-runs (markers, adoption, partial insert, verdict binding)', () => {
+  const pb = built.find(b => b.id === 'epic-delivery');
+  const text = Object.fromEntries(steps(pb).map(s => [s.step_type, s.instructions]));
+  // iteration counter: one immutable «Итерация N» comment per iteration, by marker
+  assert.match(text['next-card'], /\[epic-iter <meta id>#N card <id>\]/);
+  assert.match(text['loop-or-finish'], /\[epic-iter <meta id>#…\]/);
+  // child plan: key = iteration + card, marker in the goal, adopt via task_list, check before waiting, 24 h deadline
+  const child = text['child-plan'];
+  assert.match(child, /Ключ идемпотентности — N \+ карточка/);
+  assert.match(child, /goal: <первой строкой маркер \[epic-iter <meta id>#N card <id>\]/);
+  assert.match(child, /task_list/);
+  assert.ok(child.indexOf('task_get(<task id>)') < child.indexOf('task_item_wait('), 'terminal check precedes the wait');
+  assert.match(child, /24 ч/);
+  assert.match(child, /блокирующие замечания вердикта/);
+  // review bound to iteration + child + merged sha, with the engine named; bounded with a continuation
+  assert.match(text['cross-review'], /\[epic-review <meta id>#N child <child task id> sha/);
+  assert.match(text['cross-review'], /Ревьюер: <движок\/модель/);
+  assert.match(text['cross-review'], /НИКОГДА не ставь accept/);
+  assert.match(text['cross-review'], /task_item_add\(after_item_id = id ЭТОГО пункта\)/);
+  // plan update only from this iteration's verdict for this child, else the step fails
+  assert.match(text['architecture-update'], /\[epic-review <meta id>#N child <тот же child task id>/);
+  assert.match(text['architecture-update'], /task_item_exception/);
+  assert.match(text['architecture-update'], /\[epic-plan <meta id>#N\]/);
+  // loop: detect already-added items of N+1 and add only the missing ones
+  assert.match(text['loop-or-finish'], /« — итерация N\+1»/);
+  assert.match(text['loop-or-finish'], /ТОЛЬКО недостающие/);
+  // final acceptance: section by section with a continuation
+  assert.match(text['final-acceptance'], /\[epic-acceptance <meta id> section/);
+  assert.match(text['final-acceptance'], /« — продолжение»/);
 });

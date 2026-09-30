@@ -16,7 +16,7 @@
   ],
   "run_vars": "{epic: \"<URL эпик-issue>\", arch_repo: \"<owner/repo>\", max_iterations: 8}",
   "context": "Эпик: {epic}. Репозиторий архитектуры: {arch_repo}; документ плана: {plan_doc}; чек-лист приёмки: {acceptance_doc}; бюджет итераций: {max_iterations}. Если вместо значения тут имя в фигурных скобках — его не передали, бери значение по умолчанию: trained-assist/trained-agent-architecture, IMPLEMENTATION-AND-INTEGRATION-PLAN.md, ACCEPTANCE-CHECKLIST.md, 8. Ты — архитектор: решения принимаешь сам по плану и DECISIONS.md и записываешь их с рекомендацией/обоснованием; владельца не спрашивай, кроме необратимых действий и дорогих развилок архитектуры. План один — новых документов-планов не заводи.",
-  "requires": { "tools": ["playbook_run", "task_get", "task_item_add", "task_item_skip", "task_item_wait"] },
+  "requires": { "tools": ["playbook_run", "task_get", "task_list", "task_item_add", "task_item_exception", "task_item_skip", "task_item_wait"] },
   "defaults": { "max_attempts": 3, "execution_timeout_seconds": 1500, "recovery_policy": "default" },
   "notes": [
     "Цикл без конструкции повтора: одна итерация = «Следующая карточка → Дочерний план → Кросс-ревью → Обновление плана → Цикл или финиш»; последний шаг дописывает копию итерации сразу после себя (task_item_add), пока есть карточки и бюджет итераций.",
