@@ -25,6 +25,12 @@ const RED_CONCLUSIONS = new Set(['cancelled', 'skipped', 'timed_out', 'startup_f
 const LOG_TAIL_LINES = 50;
 const RUN_LOOKUP_ATTEMPTS = 3;
 const RUN_LOOKUP_DELAY_MS = 4000;
+// How much older than our own dispatch a candidate run may be and still be
+// ours. Pure clock-skew tolerance: a run created a second before the dispatch
+// cannot be ours, so a concurrent agent's run from a few seconds earlier must
+// not pass this gate (issue #64 defect 2 — the pre-dispatch id snapshot below
+// is the primary guard, this is the fallback when that snapshot fails).
+const DISPATCH_SKEW_MS = 5000;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const isRepo = r => /^[\w.-]+\/[\w.-]+$/.test(String(r || ''));
@@ -86,7 +92,8 @@ module.exports = {
         '20 minutes" needed, and it survives restarts. Writes a checklist.md in the current project directory; the ' +
         'background controller re-checks CI/merge status directly via the GitHub API for free and only wakes an ' +
         'expensive Claude/Codex session if something actually still needs attention. Works from any MCP client ' +
-        '(Claude Code, Codex, etc.) — this is the shared reflex, not a client-local convention.',
+        '(Claude Code, Codex, etc.) — this is the shared reflex, not a client-local convention. ' +
+        'This only registers tracking; for a one-off status check of a PR call pr_status (or issue_status for an issue).',
       inputSchema: {
         type: 'object',
         required: ['pr_url'],
@@ -185,11 +192,18 @@ module.exports = {
             return { ok: false, finished: true, error: `run ${run.conclusion}`, ...base };
           }
           // conclusion === 'failure': hand over what to fix.
+          // NOTE (issue #64, defect 1): "List jobs for a workflow run" has NO
+          // `status` filter — GitHub silently ignores it and answers with EVERY
+          // job of the run. The old `status=failure` query therefore returned
+          // the green staging-gate / deploy / merge jobs as well: a run where
+          // exactly one job was red came back with 9 "failed" jobs. Filter on
+          // the client, where we can actually see the conclusion.
           const failedJobs = [];
           let logTail = '';
           try {
-            const jobs = await ghFetch(`${GH_API}/repos/${repo}/actions/runs/${run.id}/jobs?filter=latest&status=failure&per_page=30`);
+            const jobs = await ghFetch(`${GH_API}/repos/${repo}/actions/runs/${run.id}/jobs?filter=latest&per_page=50`);
             for (const job of (jobs && jobs.jobs) || []) {
+              if (job.conclusion !== 'failure') continue;
               failedJobs.push({ name: job.name || null, id: job.id, url: job.html_url || null });
               if (!logTail) {
                 try { logTail = tailLines(await ghText(`${GH_API}/repos/${repo}/actions/jobs/${job.id}/logs`)); }
@@ -240,6 +254,20 @@ module.exports = {
           : { ref: testedRef };
         if (declared.includes('suite') && args.suite) body.inputs.suite = String(args.suite);
 
+        // The only thing that identifies OUR run is "it did not exist before I
+        // asked for it": the tested ref travels in the dispatch inputs, and the
+        // run object exposes nothing but head_branch = the ref we dispatched
+        // FROM (the default branch). Snapshot the current ids first, then take
+        // the newest run that was NOT in that snapshot (issue #64, defect 2:
+        // the old "newest run created in the last 60 s" rule handed an earlier
+        // concurrent run to the caller — two dispatches 16 s apart both got the
+        // first run's id, so an agent could report someone else's green/red).
+        const beforeIds = new Set();
+        try {
+          const before = await ghFetch(`${GH_API}/repos/${repo}/actions/workflows/${chosen.id}/runs?event=workflow_dispatch&per_page=100`);
+          for (const r of ((before && before.workflow_runs) || [])) beforeIds.add(r.id);
+        } catch { /* no snapshot → the skew window below still guards */ }
+
         const dispatchedAt = Date.now();
         try {
           await ghFetch(`${GH_API}/repos/${repo}/actions/workflows/${chosen.id}/dispatches`,
@@ -248,16 +276,18 @@ module.exports = {
           return { ok: false, configured: true, error: 'dispatch-failed', detail: e.message, workflow: chosen.name || null };
         }
 
-        // Find OUR run among the workflow-dispatch runs: created no earlier
-        // than the dispatch, newest first. GitHub publishes runs with a lag, so
-        // a short in-process retry — never a long hang inside one tool call.
+        // GitHub publishes runs with a lag, so a short in-process retry — never
+        // a long hang inside one tool call. A candidate must be new (not in the
+        // pre-dispatch snapshot) and no older than the dispatch + skew.
         let own = null;
         for (let attempt = 0; attempt < RUN_LOOKUP_ATTEMPTS && !own; attempt++) {
           if (attempt) await sleep(RUN_LOOKUP_DELAY_MS);
           try {
-            const list = await ghFetch(`${GH_API}/repos/${repo}/actions/workflows/${chosen.id}/runs?event=workflow_dispatch&per_page=30`);
+            const list = await ghFetch(`${GH_API}/repos/${repo}/actions/workflows/${chosen.id}/runs?event=workflow_dispatch&per_page=100`);
             const candidates = ((list && list.workflow_runs) || []).filter(r =>
-              r.event === 'workflow_dispatch' && Date.parse(r.created_at || '') >= dispatchedAt - 60_000);
+              r.event === 'workflow_dispatch' &&
+              !beforeIds.has(r.id) &&
+              Date.parse(r.created_at || '') >= dispatchedAt - DISPATCH_SKEW_MS);
             if (candidates.length) own = candidates.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
           } catch { /* retry */ }
         }
