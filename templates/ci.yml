@@ -1,0 +1,69 @@
+# Ручной прогон тестов ветки в облаке — шаблон для репозитория.
+#
+# Что это даёт: появляется команда «прогнать полный набор тестов ЛЮБОЙ ветки»
+# (GitHub → Actions → manual-tests → Run workflow → ветка), без открывания PR.
+# Запуск ТОЛЬКО читает и проверяет: он ничего не сливает в main и ничего не
+# выкатывает. PR-пайплайн (pull_request) не затрагивается — у него другая
+# concurrency-группа.
+#
+# Как ставится: плейбук ci-setup кладёт этот файл как
+# .github/workflows/manual-tests.yml (CI нет вовсе) либо добавляет блок
+# workflow_dispatch в существующий ci.yml, если все тяжёлые джобы и так
+# привязаны к push/pull_request. Идемпотентно: установленный workflow при
+# повторе распознаётся — «уже настроено».
+#
+# ── Как подставить другой стек ───────────────────────────────────────────────
+# Node (здесь по умолчанию):
+#     - uses: actions/setup-node@v4
+#       with: { node-version: 22, cache: npm }
+#     - run: npm ci
+#     - run: npm test
+# Python:
+#     - uses: actions/setup-python@v5
+#       with: { python-version: '3.12' }
+#     - run: pip install -r requirements.txt
+#     - run: pytest
+# Go:
+#     - uses: actions/setup-go@v5
+#       with: { go-version: '1.22' }
+#     - run: go test ./...
+#
+# Наборы (suite): unit / scenario / staging / all. Если наборы не нужны —
+# убери input suite и прогоняй всё; если нужны — добавь условие на шаг:
+#     - if: inputs.suite == 'unit' || inputs.suite == 'all'
+#       run: npm test -- --project=unit
+
+name: manual-tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Ветка, которую тестируем'
+        type: string
+        default: main
+      suite:
+        description: 'Набор тестов'
+        type: choice
+        options: [unit, scenario, staging, all]
+        default: all
+
+# Ручной запуск одной ветки отменяет предыдущий ручной запуск той же ветки.
+# Своя группа — чужой (pull_request) прогон отменить нельзя.
+concurrency:
+  group: manual-tests-${{ inputs.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test

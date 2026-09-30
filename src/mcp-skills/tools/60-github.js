@@ -51,7 +51,46 @@ async function ghFetch(path, opts = {}) {
   return res.json();
 }
 
+// Same authenticated GET, but the body is TEXT: workflow/job logs are served as
+// plain text (and the browser/agent follows the redirect to a signed URL), so
+// ghFetch's res.json() would throw on them.
+async function ghText(path, opts = {}) {
+  const token = getToken();
+  const url = path.startsWith('http') ? path : `${GH_API}${path}`;
+  const res = await fetch(url, {
+    ...opts,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'trained-assist-agent',
+      ...opts.headers,
+    },
+    signal: opts.signal || AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200) || res.statusText}`);
+  }
+  return res.text();
+}
+
+// Cheap "is a GitHub token available at all?" — reads USER_ID from the
+// environment on every call (the module-level one is captured at load), so a
+// caller can turn "no token" into an explicit contract error instead of
+// letting getToken()'s message leak through.
+function hasToken() {
+  if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
+  const uid = process.env.USER_ID;
+  if (!uid) return false;
+  try { return fs.existsSync(path.join(os.homedir(), 'agent-tokens', uid, 'github')); }
+  catch { return false; }
+}
+
 module.exports = {
+  // Shared GitHub plumbing for the neighbouring tool files (ci_run_branch & co).
+  // The registry only reads `.tools`, so extra exports here are inert.
+  getToken, hasToken, ghFetch, ghText,
   isReady: () => {
     if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
     if (!USER_ID) return false;

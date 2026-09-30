@@ -1,0 +1,63 @@
+{
+  "id": "epic-delivery",
+  "version": 2,
+  "scope": "system",
+  "title": "Довести эпик/план архитектуры до конца (мета-цикл)",
+  "when": "Есть эпик и единый план архитектуры с карточками (IMPLEMENTATION-AND-INTEGRATION-PLAN.md) и чек-листом приёмки; нужно автономно, в том числе ночью, пройти карточку за карточкой: дочерний инженерный план с песочницей → независимое кросс-ревью другой семьёй моделей → обновление плана → следующая карточка, и в конце — приёмка по чек-листу.",
+  "when_to_use": "Довести эпик/план архитектуры до конца автономно: карточка за карточкой с песочницей, кросс-ревью Codex и обновлением плана после каждой.",
+  "goal_template": "Довести эпик до конца: {goal}",
+  "user_value_template": "Все карточки плана доставлены дочерними планами с песочницей и приняты независимым ревью, план архитектуры отражает реальность после каждой итерации, чек-лист приёмки прогнан с отчётом.",
+  "inputs": [
+    { "name": "epic", "description": "URL эпик-issue, на котором ведётся журнал итераций" },
+    { "name": "arch_repo", "description": "репозиторий архитектуры owner/name с планом и чек-листом (по умолчанию trained-assist/trained-agent-architecture; выводится из ссылки на эпик в цели)", "required": false, "derive": "github_repo" },
+    { "name": "plan_doc", "description": "путь к документу плана в репозитории архитектуры (по умолчанию IMPLEMENTATION-AND-INTEGRATION-PLAN.md)", "required": false },
+    { "name": "acceptance_doc", "description": "путь к чек-листу приёмки (по умолчанию ACCEPTANCE-CHECKLIST.md)", "required": false },
+    { "name": "max_iterations", "description": "бюджет итераций цикла (по умолчанию 8)", "required": false }
+  ],
+  "run_vars": "{epic: \"<URL эпик-issue>\", arch_repo: \"<owner/repo>\", max_iterations: 8}",
+  "context": "Эпик: {epic}. Репозиторий архитектуры: {arch_repo}; документ плана: {plan_doc}; чек-лист приёмки: {acceptance_doc}; бюджет итераций: {max_iterations}. Если вместо значения тут имя в фигурных скобках — его не передали, бери значение по умолчанию: trained-assist/trained-agent-architecture, IMPLEMENTATION-AND-INTEGRATION-PLAN.md, ACCEPTANCE-CHECKLIST.md, 8. Ты — архитектор: решения принимаешь сам по плану и DECISIONS.md и записываешь их с рекомендацией/обоснованием; владельца не спрашивай, кроме необратимых действий и дорогих развилок архитектуры. План один — новых документов-планов не заводи.",
+  "requires": { "tools": ["playbook_run", "task_get", "task_list", "task_item_add", "task_item_exception", "task_item_skip", "task_item_wait"] },
+  "defaults": { "max_attempts": 3, "execution_timeout_seconds": 1500, "recovery_policy": "default" },
+  "notes": [
+    "Цикл без конструкции повтора: одна итерация = «Следующая карточка → Дочерний план → Кросс-ревью → Обновление плана → Цикл или финиш»; последний шаг дописывает копию итерации сразу после себя (task_item_add), пока есть карточки и бюджет итераций.",
+    "Карточки строят дочерние планы на OpenCode (их шаги master/bachelor); если OpenCode дважды провалил шаг по качеству — третья попытка на Claude (escalate_to_doctor). Claude (doctor) — только архитектурные шаги мета-цикла: предполётная проверка, выбор карточки, обновление плана, приёмка. Проверяет другая семья моделей (reviewer · doctor → Codex, запасной OpenCode doctor). Кросс-ревью не правит код — только вердикт и замечания."
+  ],
+  "stages": [
+    {
+      "id": "preflight",
+      "title": "Подготовка эпика",
+      "steps": [
+        { "use": "epic-preflight" }
+      ]
+    },
+    {
+      "id": "iteration",
+      "title": "Итерация: карточка → песочница → кросс-ревью → план",
+      "steps": [
+        { "use": "next-card" },
+        { "use": "child-plan" },
+        { "use": "cross-review" },
+        { "use": "architecture-update" },
+        { "use": "loop-or-finish" }
+      ]
+    },
+    {
+      "id": "acceptance",
+      "title": "Финальная приёмка",
+      "steps": [
+        { "use": "final-acceptance", "on_complete": [{ "type": "notify", "to": "owner", "text": "Финальная приёмка эпика прогнана, отчёт на эпике: {goal}" }] }
+      ]
+    },
+    {
+      "id": "archive",
+      "title": "Архивация",
+      "steps": [
+        { "use": "archive", "notes": ["Для эпика: итоговый комментарий на эпике (карточки, дочерние планы, вердикты ревью, отчёт приёмки, что осталось); эпик закрывай только если приёмка принята целиком. Живые доки — в репозитории архитектуры, через PR."] }
+      ]
+    }
+  ],
+  "hooks": {
+    "task_done": [{ "type": "notify", "to": "owner", "text": "Эпик пройден до конца, приёмка на эпике: {goal}" }],
+    "task_failed": [{ "type": "notify", "to": "owner", "text": "Мета-цикл эпика застрял: {goal} — {error}" }]
+  }
+}
