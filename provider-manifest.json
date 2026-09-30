@@ -6,15 +6,30 @@
       "name": "engineering_prepare_task",
       "inputSchema": {
         "type": "object",
-        "required": ["repo_path", "task"],
+        "required": [
+          "repo_path",
+          "task"
+        ],
         "properties": {
-          "repo_path": { "type": "string" },
-          "task": { "type": "string" },
-          "prefer_index": { "type": "boolean" },
-          "max_results": { "type": "number" }
+          "repo_path": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "prefer_index": {
+            "type": "boolean"
+          },
+          "max_results": {
+            "type": "number"
+          }
         }
       },
-      "allowedTriggers": ["user", "cron", "system"],
+      "allowedTriggers": [
+        "user",
+        "cron",
+        "system"
+      ],
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
@@ -23,15 +38,69 @@
       "name": "engineering_repo_context",
       "inputSchema": {
         "type": "object",
-        "required": ["repo_path", "keywords"],
+        "required": [
+          "repo_path",
+          "keywords"
+        ],
         "properties": {
-          "repo_path": { "type": "string" },
-          "keywords": { "type": ["string", "array"] },
-          "max_results": { "type": "number" },
-          "budget": { "type": "number" }
+          "repo_path": {
+            "type": "string"
+          },
+          "keywords": {
+            "type": [
+              "string",
+              "array"
+            ]
+          },
+          "max_results": {
+            "type": "number"
+          },
+          "budget": {
+            "type": "number"
+          }
         }
       },
-      "allowedTriggers": ["user", "system"],
+      "allowedTriggers": [
+        "user",
+        "system"
+      ],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "repo_map",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string"
+          },
+          "repo_path": {
+            "type": "string"
+          },
+          "level": {
+            "type": [
+              "number",
+              "integer"
+            ]
+          },
+          "focus": {
+            "type": [
+              "string",
+              "array"
+            ]
+          },
+          "sha": {
+            "type": "string"
+          }
+        }
+      },
+      "allowedTriggers": [
+        "user",
+        "cron",
+        "system"
+      ],
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
@@ -40,28 +109,48 @@
       "name": "engineering_pr_autofix_register",
       "inputSchema": {
         "type": "object",
-        "required": ["repo"],
+        "required": [
+          "repo"
+        ],
         "properties": {
-          "repo": { "type": "string" },
-          "base_branch": { "type": "string" },
+          "repo": {
+            "type": "string"
+          },
+          "base_branch": {
+            "type": "string"
+          },
           "features": {
             "type": "object",
             "properties": {
-              "fix": { "type": "boolean" },
-              "cleanup": { "type": "boolean" },
-              "batch": { "type": "boolean" }
+              "fix": {
+                "type": "boolean"
+              },
+              "cleanup": {
+                "type": "boolean"
+              },
+              "batch": {
+                "type": "boolean"
+              }
             },
             "additionalProperties": false
           },
-          "autofix_ref": { "type": "string" },
-          "ci_workflow_name": { "type": "string" },
+          "autofix_ref": {
+            "type": "string"
+          },
+          "ci_workflow_name": {
+            "type": "string"
+          },
           "capabilities": {
             "type": "object",
-            "additionalProperties": { "type": "string" }
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         }
       },
-      "allowedTriggers": ["user"],
+      "allowedTriggers": [
+        "user"
+      ],
       "effect": "write",
       "requiresApproval": false,
       "retrySafety": "idempotent"
@@ -70,15 +159,27 @@
       "name": "engineering_pr_autofix_install",
       "inputSchema": {
         "type": "object",
-        "required": ["repo"],
+        "required": [
+          "repo"
+        ],
         "properties": {
-          "repo": { "type": "string" },
-          "base_branch": { "type": "string" },
-          "autofix_ref": { "type": "string" },
-          "ci_workflow_name": { "type": "string" }
+          "repo": {
+            "type": "string"
+          },
+          "base_branch": {
+            "type": "string"
+          },
+          "autofix_ref": {
+            "type": "string"
+          },
+          "ci_workflow_name": {
+            "type": "string"
+          }
         }
       },
-      "allowedTriggers": ["user"],
+      "allowedTriggers": [
+        "user"
+      ],
       "effect": "write",
       "requiresApproval": true,
       "retrySafety": "idempotent"
@@ -89,10 +190,15 @@
         "type": "object",
         "required": [],
         "properties": {
-          "repo": { "type": "string" }
+          "repo": {
+            "type": "string"
+          }
         }
       },
-      "allowedTriggers": ["user", "system"],
+      "allowedTriggers": [
+        "user",
+        "system"
+      ],
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
@@ -101,12 +207,18 @@
       "name": "engineering_pr_autofix_disable",
       "inputSchema": {
         "type": "object",
-        "required": ["repo"],
+        "required": [
+          "repo"
+        ],
         "properties": {
-          "repo": { "type": "string" }
+          "repo": {
+            "type": "string"
+          }
         }
       },
-      "allowedTriggers": ["user"],
+      "allowedTriggers": [
+        "user"
+      ],
       "effect": "write",
       "requiresApproval": false,
       "retrySafety": "idempotent"
@@ -115,18 +227,34 @@
       "name": "qa_log_register",
       "inputSchema": {
         "type": "object",
-        "required": ["name", "location", "how_to_read"],
+        "required": [
+          "name",
+          "location",
+          "how_to_read"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "location": { "type": "string" },
+          "name": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
           "ttl": {},
           "fields": {},
-          "how_to_read": { "type": "string" },
-          "owner": { "type": "string" },
-          "source": { "type": "string" }
+          "how_to_read": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
         }
       },
-      "allowedTriggers": ["user"],
+      "allowedTriggers": [
+        "user"
+      ],
       "effect": "write",
       "requiresApproval": false,
       "retrySafety": "idempotent"
@@ -135,13 +263,22 @@
       "name": "qa_log_lookup",
       "inputSchema": {
         "type": "object",
-        "required": ["query"],
+        "required": [
+          "query"
+        ],
         "properties": {
-          "query": { "type": "string" },
-          "max_results": { "type": "number" }
+          "query": {
+            "type": "string"
+          },
+          "max_results": {
+            "type": "number"
+          }
         }
       },
-      "allowedTriggers": ["user", "system"],
+      "allowedTriggers": [
+        "user",
+        "system"
+      ],
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
@@ -153,7 +290,10 @@
         "required": [],
         "properties": {}
       },
-      "allowedTriggers": ["user", "system"],
+      "allowedTriggers": [
+        "user",
+        "system"
+      ],
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
