@@ -1,6 +1,6 @@
 'use strict';
 
-// Engineering playbooks (feature / debugging / new-software): the committed
+// Engineering playbooks (feature / debugging / new-software / skill-tool): the committed
 // Playbook v1 output is in sync with its sources, valid against the vendored
 // contract, and keeps the process invariants the playbooks are built on.
 
@@ -25,7 +25,7 @@ const DETERMINISTIC_KEYS = ['ci_green', 'ci_and_staging_green', 'ci_run_green', 
 // apply to the change-flow set only. Schema validity, typed steps and the
 // declared inputs are checked for EVERY playbook.
 const CHANGE_FLOW = new Set(['debugging', 'feature', 'new-software']);
-const ALL_PLAYBOOKS = ['ci-run', 'ci-setup', 'debugging', 'feature', 'new-software'];
+const ALL_PLAYBOOKS = ['ci-run', 'ci-setup', 'debugging', 'feature', 'new-software', 'skill-tool'];
 
 // Minimal JSON-Schema (draft-07 subset used by playbook.schema.json) — no deps in CI.
 function validate(value, sch, at = '$', errors = []) {
@@ -71,7 +71,7 @@ test('committed playbooks and docs are in sync with sources (npm run build:playb
   }
 });
 
-test('every expected playbook exists (the owner added ci-setup and ci-run to the three change-flow ones)', () => {
+test('every expected playbook exists (the three change-flow ones plus ci-setup, ci-run and skill-tool)', () => {
   assert.deepEqual(built.map(b => b.id).sort(), ALL_PLAYBOOKS);
 });
 
@@ -99,7 +99,7 @@ for (const pb of built) {
     const repo = (pb.inputs || []).find(i => i.name === 'repo');
     assert.ok(repo, 'repo input declared');
     assert.equal(repo.derive, 'github_repo');
-    // feature/debugging always work in an existing repository; new-software may create it.
+    // feature/debugging/skill-tool always work in an existing repository; new-software may create it.
     assert.equal(repo.required !== false, pb.id !== 'new-software');
   });
 }

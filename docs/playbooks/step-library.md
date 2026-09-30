@@ -6,31 +6,31 @@ Typed step library for the engineering playbooks. One step type = one reusable u
 
 | Тип | Название | OpenSpec / аналог | Исполнитель | Проверка | Где используется |
 |---|---|---|---|---|---|
-| `define-use-case` | Сценарий пользователя: ценность и шаги | explore (часть) / Spec Kit: specify + clarify | researcher · master | `use_case_value_and_steps_written` | feature, new-software |
-| `explore-context` | Исследование: как устроено сейчас и как делают другие | explore | researcher · bachelor | `context_explored_with_references` | feature, new-software |
+| `define-use-case` | Сценарий пользователя: ценность и шаги | explore (часть) / Spec Kit: specify + clarify | researcher · master | `use_case_value_and_steps_written` | feature, new-software, skill-tool |
+| `explore-context` | Исследование: как устроено сейчас и как делают другие | explore | researcher · bachelor | `context_explored_with_references` | feature, new-software, skill-tool |
 | `infra-discovery` | Разведка инфраструктуры и уровней доступа | — | researcher · bachelor | `infrastructure_and_access_inventoried` | new-software |
-| `requirements-complexity` | Сложность требований: флаги и челлендж | explore (часть) / Shape Up: appetite, rabbit holes, no-gos | reviewer · master | `requirements_flagged_and_challenged` | feature, new-software |
+| `requirements-complexity` | Сложность требований: флаги и челлендж | explore (часть) / Shape Up: appetite, rabbit holes, no-gos | reviewer · master | `requirements_flagged_and_challenged` | feature, new-software, skill-tool |
 | `solution-options` | Варианты решения, ранжированные по песочнице | explore → propose (выбор) / ADR | developer · doctor | `options_ranked_and_decision_recorded` | new-software |
-| `propose-change` | Предложение изменения: дизайн, срезы, проверка, откат | propose (proposal.md + design.md + tasks.md + spec delta) | developer · master | `change_proposed_with_tests_and_rollback` | debugging, feature |
-| `plan-declaration` | Декларация плана: GitHub issue | propose (публикация) / Spec Kit: tasks | developer · bachelor | `issue_created_with_plan` | debugging, feature, new-software |
-| `sandbox` | Песочница: замкнутый цикл, который повторяет сценарий | — (наш слой между propose и apply) | developer · master | `sandbox_loop_runs_and_fails_for_the_right_reason` | feature, new-software |
+| `propose-change` | Предложение изменения: дизайн, срезы, проверка, откат | propose (proposal.md + design.md + tasks.md + spec delta) | developer · master | `change_proposed_with_tests_and_rollback` | debugging, feature, skill-tool |
+| `plan-declaration` | Декларация плана: GitHub issue | propose (публикация) / Spec Kit: tasks | developer · bachelor | `issue_created_with_plan` | debugging, feature, new-software, skill-tool |
+| `sandbox` | Песочница: замкнутый цикл, который повторяет сценарий | — (наш слой между propose и apply) | developer · master | `sandbox_loop_runs_and_fails_for_the_right_reason` | feature, new-software, skill-tool |
 | `bug-context` | Сбор контекста бага | explore | researcher · bachelor | `bug_facts_collected_with_r_level` | debugging |
 | `reproduce` | Воспроизведение: поднять R до песочницы | — (наш слой sandbox) | developer · master | `bug_reproduced_or_r_level_raised` | debugging |
 | `root-cause` | Корневая причина | explore → propose | researcher · master | `root_cause_identified_with_evidence` | debugging |
-| `implement` | Реализация в изолированном workspace | apply | developer · master | `implementation_complete_and_sandbox_green` | debugging, feature, new-software |
-| `verify-local` | Полная локальная проверка | apply (verify) | verifier · bachelor | `local_checks_and_tests_green` | debugging, feature, new-software |
+| `implement` | Реализация в изолированном workspace | apply | developer · master | `implementation_complete_and_sandbox_green` | debugging, feature, new-software, skill-tool |
+| `verify-local` | Полная локальная проверка | apply (verify) | verifier · bachelor | `local_checks_and_tests_green` | debugging, feature, new-software, skill-tool |
 | `ci-setup` | Настроить ручной прогон тестов в репозитории | setup (ci) | developer · master | `ci_workflow_configured` | ci-setup |
 | `ci-run` | Прогнать тесты ветки в облаке и вернуть результат | apply (verify) | developer · bachelor | `cloud_test_result_reported` | ci-run |
-| `open-pr` | Открыть PR | apply (submit) | developer · bachelor | `pr_opened` | ci-setup, debugging, feature, new-software |
-| `ci-green` | CI зелёный (ждём; чиним, если красный) | apply (verify) | developer · bachelor | `ci_green` | ci-setup, debugging, feature, new-software |
-| `merged` | PR смержен | apply (deliver) | программно | `merged` | ci-setup, debugging, feature, new-software |
-| `deployed` | Деплой прошёл и живой | apply (deliver) | verifier · bachelor | `deployed_version_is_live` | debugging, feature |
-| `verify-real` | Проверка сценария в реальном окружении | apply (verify) | verifier · master | `user_scenario_verified_in_real_environment` | ci-setup, feature, new-software |
+| `open-pr` | Открыть PR | apply (submit) | developer · bachelor | `pr_opened` | ci-setup, debugging, feature, new-software, skill-tool |
+| `ci-green` | CI зелёный (ждём; чиним, если красный) | apply (verify) | developer · bachelor | `ci_green` | ci-setup, debugging, feature, new-software, skill-tool |
+| `merged` | PR смержен | apply (deliver) | программно | `merged` | ci-setup, debugging, feature, new-software, skill-tool |
+| `deployed` | Деплой прошёл и живой | apply (deliver) | verifier · bachelor | `deployed_version_is_live` | debugging, feature, skill-tool |
+| `verify-real` | Проверка сценария в реальном окружении | apply (verify) | verifier · master | `user_scenario_verified_in_real_environment` | ci-setup, feature, new-software, skill-tool |
 | `observe` | Наблюдение после релиза (если нужно) | — | verifier · bachelor | `post_release_observation_done_or_not_needed` | feature |
 | `confirm-fixed` | Подтвердить, что ошибка ушла в проде | — | verifier · bachelor | `error_gone_in_production` | debugging |
 | `repo-bootstrap` | Каркас репозитория | — (Spec Kit: constitution) | developer · bachelor | `repo_bootstrapped_with_ci_and_docs` | new-software |
 | `go-live` | Из песочницы в реальное окружение | apply (deliver) | developer · master | `running_in_real_environment` | new-software |
-| `archive` | Архивация: обновить живые доки и закрыть план | archive (слить spec delta в живые спеки) | reviewer · bachelor | `living_docs_updated_and_plan_closed` | debugging, feature, new-software |
+| `archive` | Архивация: обновить живые доки и закрыть план | archive (слить spec delta в живые спеки) | reviewer · bachelor | `living_docs_updated_and_plan_closed` | debugging, feature, new-software, skill-tool |
 
 ## Лестницы
 
