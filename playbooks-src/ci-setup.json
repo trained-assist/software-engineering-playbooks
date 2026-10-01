@@ -1,6 +1,6 @@
 {
   "id": "ci-setup",
-  "version": 1,
+  "version": 2,
   "scope": "system",
   "title": "Настройка ручного прогона тестов в репозитории",
   "goal_template": "{goal}",

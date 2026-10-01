@@ -363,6 +363,7 @@
       "context_budget": "small",
       "execution_timeout_seconds": 600,
       "validation": { "pr_opened": true },
+      "already_done": { "pr_opened": true },
       "substeps": [
         "Перед пушем: ветка твоя (создана в этом плане), не main/master, нет открытого PR на эту ветку (PR неизменяемы — правки после открытия идут новой веткой и новым PR).",
         "git push -u origin <ветка>; gh pr create с телом: ссылка на issue, сценарий, что изменено, доказательства песочницы (до: красный, после: зелёный), план проверки, риски/откат.",
@@ -382,6 +383,7 @@
       "context_budget": "medium",
       "execution_timeout_seconds": 1200,
       "validation": { "ci_green": true },
+      "already_done": { "ci_green": true },
       "substeps": [
         "Посмотри статус чеков PR (gh pr checks <url>).",
         "Ещё идут → task_item_wait(until: {ci_green: \"<PR url>\"}, poll_every_sec: 300, timeout_sec: 7200, reason: \"ждём CI\") → DURABLE: waiting. Сервер разбудит, когда CI закончится (зелёный — условие выполнено; красный — «окончательно не выполнилось»).",

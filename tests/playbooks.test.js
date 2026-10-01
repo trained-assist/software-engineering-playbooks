@@ -108,6 +108,18 @@ for (const pb of built) {
         assert.equal(step.execution_kind, 'programmatic', `${step.title}: wait only on programmatic steps`);
         for (const key of Object.keys(step.validation)) assert.ok(DETERMINISTIC_KEYS.includes(key), `${step.title}: ${key} is pollable`);
       }
+      if (step.already_done) {
+        for (const key of Object.keys(step.already_done)) {
+          assert.ok(DETERMINISTIC_KEYS.includes(key), `${step.title}: already_done ${key} is a deterministic validator`);
+        }
+      }
+      // #1959: a step whose checks are ALL deterministic must not spend a model run
+      // when the result already holds — it must be programmatic or carry already_done.
+      const vkeys = Object.keys(step.validation);
+      if (step.execution_kind !== 'programmatic' && vkeys.length && vkeys.every(k => DETERMINISTIC_KEYS.includes(k))) {
+        assert.ok(step.already_done && Object.keys(step.already_done).length,
+          `${step.title}: all checks are deterministic ⇒ needs already_done (or programmatic)`);
+      }
       for (const [, name] of step.instructions.matchAll(/\{(\w+)\}/g)) {
         assert.ok(name === 'goal' || declared.has(name), `${step.title}: {${name}} is a declared input`);
       }

@@ -20,8 +20,8 @@
 | 6 | Песочница: сначала красный тест, потом код | Песочница: замкнутый цикл, который повторяет сценарий | `sandbox` | developer · master (сильная дешёвая) · large | `sandbox_loop_runs_and_fails_for_the_right_reason` |
 | 7 | Реализация | Реализация в изолированном workspace | `implement` | developer · master (сильная дешёвая) · large | `implementation_complete_and_sandbox_green` |
 | 8 | Реализация | Полная локальная проверка | `verify-local` | verifier · bachelor (дешёвая модель) · medium | `local_checks_and_tests_green` |
-| 9 | Реализация | Открыть PR | `open-pr` | developer · bachelor (дешёвая модель) · small | `pr_opened` |
-| 10 | Доставка и проверка в реальности | CI зелёный (ждём; чиним, если красный) | `ci-green` | developer · bachelor (дешёвая модель) · medium | `ci_and_staging_green` |
+| 9 | Реализация | Открыть PR | `open-pr` | developer · bachelor (дешёвая модель) · small, уже-выполнено: pr_opened | `pr_opened` |
+| 10 | Доставка и проверка в реальности | CI зелёный (ждём; чиним, если красный) | `ci-green` | developer · bachelor (дешёвая модель) · medium, уже-выполнено: ci_and_staging_green | `ci_and_staging_green` |
 | 11 | Доставка и проверка в реальности | PR смержен | `merged` | программно, ждёт (опрос 5 мин, таймаут 24 ч) | `merged` |
 | 12 | Доставка и проверка в реальности | Деплой прошёл и живой | `deployed` | verifier · bachelor (дешёвая модель) · small | `deployed_version_is_live` |
 | 13 | Доставка и проверка в реальности | Тул виден в новой сессии | `verify-real` | verifier · master (сильная дешёвая) · medium | `user_scenario_verified_in_real_environment` |
