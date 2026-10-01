@@ -51,7 +51,7 @@ const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
 // metadata + workflows for autodetect, and the content/ref/pull endpoints the installer uses.
 function fake({ base = 'main', repo = 'trained-assist/demo', defaultBranch = null, workflowNames = ['CI'], callableRefs = null, files = {} } = {}) {
   const state = { refs: { [base]: 'sha0' }, snapshots: { sha0: { ...files } }, pulls: [], shaSeq: 0, prSeq: 0, base };
-  const snapshotOf = (b) => state.snapshots[state.refs[b]] || {};
+  const snapshotOf = (b) => state.snapshots[state.refs[b] || b] || {};
 
   async function ghFetch(method, endpoint, body) {
     const upper = String(method || 'GET').toUpperCase();
@@ -236,13 +236,12 @@ test('a repeat that changes content after a no-op is reported as non-idempotent'
   gh.state.pulls[0].merge();
 
   // The base branch drifts under us: setup sees pinned content (no-op), run sees other bytes.
-  let calls = 0;
+  let reads = 0;
   const flaky = {
     ghToken: 'fake',
     ghFetch: async (...args) => {
-      calls += 1;
       const res = await gh.ghFetch(...args);
-      if (calls === 12) {
+      if (args[0] === 'GET' && args[1].includes('/git/ref/heads/main') && ++reads === 1) {
         const main = gh.state.refs.main;
         gh.state.snapshots[main] = { ...gh.state.snapshots[main], '.github/workflows/pr-autofix.yml': '# tampered\n' };
       }
