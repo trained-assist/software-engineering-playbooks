@@ -149,3 +149,19 @@ lifecycle + owner notifications.
 - pr-autofix uses free models — failure/flakiness is expected; the service must surface, not hide it.
 - Out of scope: reimplementing the fixer; auto-enabling autofix on any repo; changes to the agent's
   own CI; the Merge Relay worker (separate deployable, see `docs/GITHUB-ONBOARDING.md`).
+
+### Z01 setup receipt and reviewed construction tasks
+
+`npm run setup:devbaseline -- --repo owner/name --ref v1.7.4 --json` creates a
+registration when absent, installs through the existing installer, repeats it and reads
+commit/file SHAs from the GitHub API. A repeat that changes content or revision fails.
+Teardown restores only that repository's original local registration, also on failure;
+the proposed installation PR remains reviewable. `--no-teardown` keeps the registration.
+
+`node scripts/devbaseline-construction-tasks.js --table coverage.json --tool /pinned/pr-autofix`
+is a dry-run with no GitHub calls. For application add `--apply --review reviewed.json
+--receipts receipts.jsonl`. The reviewed file must have `approved:true`, the exact table's
+`table_sha256`, `source` equal to the Z01 issue URL, and one entry per generated task:
+`{repo, kind, owner: repo, task: <unchanged generated task>}`. This binds every missing method
+to its owning repository. Application checks stable issue markers before creating anything,
+preserves a receipt after each action and resumes without duplicates after interruption.
