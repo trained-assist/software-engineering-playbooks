@@ -16,10 +16,8 @@
 //   6 = invalid state
 
 const path = require('path');
-const fs = require('fs');
 const os = require('os');
 const { setupDevbaseline, SETUP_CODES } = require('../src/pr-autofix/setup');
-const { registerAutofix, registrationFile } = require('../src/pr-autofix/registry');
 
 function parseArgv(argv) {
   const flags = {};
@@ -51,13 +49,6 @@ function main() {
   const profileId = typeof flags['profile-id'] === 'string' ? flags['profile-id'] : 'default';
   const root = typeof flags.root === 'string' ? flags.root : defaultRoot(profileId);
 
-  // Registration is local bookkeeping the installer requires to exist. Creating it here keeps
-  // the procedure to one command; the repository is still only ever touched through a PR.
-  if (!fs.existsSync(registrationFile({ profileId, root }))) {
-    registerAutofix({ profileId, root, repo, features: { fix: true, cleanup: true, batch: true } });
-    process.stdout.write(`registered ${repo} in ${root}\n`);
-  }
-
   return setupDevbaseline({
     repo,
     profileId,
@@ -85,4 +76,7 @@ function main() {
   });
 }
 
-process.exitCode = main();
+Promise.resolve().then(main).then((code) => { process.exitCode = code; }).catch((e) => {
+  process.stderr.write(`error: ${e.code || 'ERROR'} ${e.message}\n`);
+  process.exitCode = SETUP_CODES.PHASE_UNOBSERVABLE;
+});

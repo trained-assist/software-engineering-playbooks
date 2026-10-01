@@ -107,7 +107,7 @@ function makeFakeGithub({
         if (!ok || !TOOL_CALLABLES.includes(filePath)) {
           return { status: 404, ok: false, data: { message: 'Not Found' } };
         }
-        return { status: 200, ok: true, data: { content: b64('# callable\n'), sha: 'blob:tool' } };
+        return { status: 200, ok: true, data: { content: b64('on:\n  workflow_call:\n'), sha: 'blob:tool' } };
       }
     }
     if (upper === 'GET' && (m = route.match(/^\/repos\/([^/]+)\/([^/]+)$/))) {
