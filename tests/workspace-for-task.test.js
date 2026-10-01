@@ -152,3 +152,82 @@ test('missing principal/repositoryUrl/rootTaskId fails explicitly', () => {
   assert.throws(() => spawnWorkspaceForTask({ principal: 'vova', rootTaskId: 'y' }), WorkspaceError);
   assert.throws(() => spawnWorkspaceForTask({ principal: 'vova', repositoryUrl: 'x' }), WorkspaceError);
 });
+
+// Operation records used to be stored under the bare idempotency key, which
+// for-task.js sets to rootTaskId. One plan that touches two repositories — the
+// normal case, e.g. a card with an anchor repo and a consumer repo — therefore
+// had the second repository compare its fingerprint against the first
+// repository's operation record and fail with "idempotency key was already
+// used with incompatible arguments". That is what stopped plan c4c5b145
+// (card Z01 of the architecture epic) on 2026-10-01: the pr-autofix workspace
+// held the plan's key, so playbooks and trained-agent-architecture could not be
+// spawned at all. One task label must be usable in every repository of the
+// plan, and still reuse its own workspace on a resume.
+test('one rootTaskId holds a workspace in several repositories of the same plan', () => {
+  const anchorRepo = makeRemote();
+  const consumerRepo = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', rootTaskId: 'plan-c4c5b145', workspaceRoot, mirrorsRoot };
+
+  const anchor = spawnWorkspaceForTask({ ...opts, repositoryUrl: anchorRepo });
+  const consumer = spawnWorkspaceForTask({ ...opts, repositoryUrl: consumerRepo });
+
+  assert.equal(anchor.status, 'code_ready');
+  assert.equal(consumer.status, 'code_ready');
+  assert.notEqual(anchor.workspaceId, consumer.workspaceId);
+  assert.notEqual(anchor.codePath, consumer.codePath);
+  assert.ok(fs.existsSync(path.join(consumer.codePath, 'README.md')));
+
+  // Each repository keeps its own resumable workspace.
+  assert.equal(spawnWorkspaceForTask({ ...opts, repositoryUrl: anchorRepo }).workspaceId, anchor.workspaceId);
+  assert.equal(spawnWorkspaceForTask({ ...opts, repositoryUrl: consumerRepo }).workspaceId, consumer.workspaceId);
+});
+
+test('one rootTaskId is not shared between principals', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+
+  const mine = spawnWorkspaceForTask({ principal: 'vova', repositoryUrl, rootTaskId: 'plan-c4c5b145', workspaceRoot, mirrorsRoot });
+  const other = spawnWorkspaceForTask({ principal: 'petr', repositoryUrl, rootTaskId: 'plan-c4c5b145', workspaceRoot, mirrorsRoot });
+
+  assert.equal(mine.status, 'code_ready');
+  assert.equal(other.status, 'code_ready');
+  assert.notEqual(mine.workspaceId, other.workspaceId);
+  assert.notEqual(mine.branch, other.branch);
+});
+
+// The protection the scoping above must not weaken: one idempotency key reused
+// for a different task in the same repository is still a caller bug.
+test('reusing one operation key for a different task in the same repository still conflicts', () => {
+  const { spawnWorkspace } = require('../src/workspace/workspace');
+  const source = makeSourceRepo();
+  const root = tmp('eng-ws-');
+  const binding = {
+    workspaceRoot: root,
+    sourceCheckout: source.dir,
+    principal: 'vova',
+    hostId: 'test-host',
+    repositoryId: 'acme/app',
+    baseRevision: runGit(source.dir, ['rev-parse', 'HEAD']).trim(),
+    rootTaskId: 'task-a',
+    idempotencyKey: 'op-1',
+    allowFetch: false,
+  };
+
+  spawnWorkspace(binding);
+  assert.throws(
+    () => spawnWorkspace({ ...binding, rootTaskId: 'task-b' }),
+    (error) => error instanceof WorkspaceError && error.code === 'CONFLICT',
+  );
+});
+
+function makeSourceRepo() {
+  const dir = tmp('eng-source-');
+  runGit(dir, ['init', '-q', '-b', 'main']);
+  fs.writeFileSync(path.join(dir, 'README.md'), '# source\n');
+  runGit(dir, ['add', '.']);
+  runGit(dir, ['config', 'user.email', 'test@example.com']);
+  runGit(dir, ['config', 'user.name', 'Test']);
+  runGit(dir, ['commit', '-qm', 'initial']);
+  return { dir };
+}

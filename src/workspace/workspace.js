@@ -27,6 +27,20 @@ function workspaceIdOf(ownerKey, idempotencyKey) {
   return `ws-${store.shortHash(`${ownerKey}\u0000${idempotencyKey}`, 16)}`;
 }
 
+// Operation records share one flat store per workspaceRoot, so their key must
+// identify the operation the way the caller does: (principal, repository) plus
+// the idempotency key it handed in. Keying them by the bare idempotencyKey made
+// one plan unable to touch two repositories — for-task.js passes rootTaskId as
+// the idempotency key, so the second repository compared its fingerprint (which
+// contains repositoryId) against the first repository's record and refused with
+// CONFLICT "idempotency key was already used with incompatible arguments".
+// rootTaskId stays out of this key on purpose: reusing one idempotency key for
+// two different tasks in the same repository is a caller bug and must keep
+// conflicting.
+function operationKeyOf({ principal, repositoryId }, idempotencyKey) {
+  return `${principal}\u0000${repositoryId}\u0000${idempotencyKey}`;
+}
+
 function normalizeBinding(binding) {
   if (!binding || typeof binding !== 'object') fail('INVALID_BINDING', 'binding object is required');
   const required = ['workspaceRoot', 'principal', 'hostId', 'repositoryId', 'sourceCheckout', 'baseRevision', 'rootTaskId', 'idempotencyKey'];
@@ -146,7 +160,7 @@ function buildRecord({ b, resolvedBase, workspaceId, layout, ownerKey, fingerpri
     codePath: layout.codePath,
     runtimePath: layout.runtimePath,
     sourceCheckout: b.sourceCheckout,
-    operationKey: b.idempotencyKey,
+    operationKey: operationKeyOf(b, b.idempotencyKey),
     operationFingerprint: fingerprint,
     ownerKey,
     leaseGeneration,
@@ -228,6 +242,7 @@ function saveWorkspace(workspaceRoot, record) {
 function completeProvision({ b, resolvedBase, fingerprint, workspaceId, layout, ownerKey, hooks = {}, reused = false, leaseGeneration = 1 }) {
   store.ensureStore(b.workspaceRoot);
   const intent = readIntent(b.workspaceRoot, workspaceId) || {};
+  const operationKey = operationKeyOf(b, b.idempotencyKey);
   let state = intent.state || 'reserved';
 
   let worktree = git.worktreeForPath(b.sourceCheckout, layout.codePath);
@@ -296,8 +311,8 @@ function completeProvision({ b, resolvedBase, fingerprint, workspaceId, layout, 
   saveWorkspace(b.workspaceRoot, record);
 
   writeIntent(b.workspaceRoot, workspaceId, { state: CODE_READY, attempts: (intent.attempts || 0) + 1, lastError: null });
-  writeOperation(b.workspaceRoot, b.idempotencyKey, {
-    operationKey: b.idempotencyKey,
+  writeOperation(b.workspaceRoot, operationKey, {
+    operationKey,
     fingerprint,
     workspaceId,
     ownerKey,
@@ -306,7 +321,7 @@ function completeProvision({ b, resolvedBase, fingerprint, workspaceId, layout, 
   writeOwner(b.workspaceRoot, ownerKey, {
     ownerKey,
     workspaceId,
-    operationKey: b.idempotencyKey,
+    operationKey,
     principal: b.principal,
     hostId: b.hostId,
     repositoryId: b.repositoryId,
@@ -327,6 +342,7 @@ function spawnWorkspace(binding, options = {}) {
   const fingerprint = fingerprintOf(b, resolvedBase);
   const ownerKey = ownerKeyOf(b);
   const workspaceId = workspaceIdOf(ownerKey, b.idempotencyKey);
+  const operationKey = operationKeyOf(b, b.idempotencyKey);
   const layout = layoutFor(b, workspaceId);
 
   assertContained(b.workspaceRoot, layout.workspaceDir, 'workspace directory');
@@ -335,11 +351,11 @@ function spawnWorkspace(binding, options = {}) {
 
   store.ensureStore(b.workspaceRoot);
 
-  const existingOp = readOperation(b.workspaceRoot, b.idempotencyKey);
+  const existingOp = readOperation(b.workspaceRoot, operationKey);
   if (existingOp) {
     if (existingOp.fingerprint !== fingerprint) {
       fail('CONFLICT', 'idempotency key was already used with incompatible arguments', {
-        operationKey: b.idempotencyKey,
+        operationKey,
         existingWorkspaceId: existingOp.workspaceId,
         workspaceId,
       });
@@ -350,14 +366,14 @@ function spawnWorkspace(binding, options = {}) {
     }
   }
 
-  const releaseOp = store.acquireLock(store.lockFile(b.workspaceRoot, `op:${b.idempotencyKey}`));
+  const releaseOp = store.acquireLock(store.lockFile(b.workspaceRoot, `op:${operationKey}`));
   const releaseOwner = store.acquireLock(store.lockFile(b.workspaceRoot, `owner:${ownerKey}`));
   try {
-    const op = readOperation(b.workspaceRoot, b.idempotencyKey);
+    const op = readOperation(b.workspaceRoot, operationKey);
     if (op) {
       if (op.fingerprint !== fingerprint) {
         fail('CONFLICT', 'idempotency key was already used with incompatible arguments', {
-          operationKey: b.idempotencyKey,
+          operationKey,
           existingWorkspaceId: op.workspaceId,
           workspaceId,
         });
@@ -385,8 +401,8 @@ function spawnWorkspace(binding, options = {}) {
     }
     const nextLease = (owner && owner.leaseGeneration ? owner.leaseGeneration : 0) + 1;
 
-    writeOperation(b.workspaceRoot, b.idempotencyKey, {
-      operationKey: b.idempotencyKey,
+    writeOperation(b.workspaceRoot, operationKey, {
+      operationKey,
       fingerprint,
       workspaceId,
       ownerKey,
@@ -395,7 +411,8 @@ function spawnWorkspace(binding, options = {}) {
     });
     writeIntent(b.workspaceRoot, workspaceId, {
       intentId: workspaceId,
-      operationKey: b.idempotencyKey,
+      operationKey,
+      idempotencyKey: b.idempotencyKey,
       ownerKey,
       workspaceId,
       state: 'reserved',
@@ -418,7 +435,7 @@ function spawnWorkspace(binding, options = {}) {
     writeOwner(b.workspaceRoot, ownerKey, {
       ownerKey,
       workspaceId,
-      operationKey: b.idempotencyKey,
+      operationKey,
       principal: b.principal,
       hostId: b.hostId,
       repositoryId: b.repositoryId,
@@ -644,7 +661,10 @@ function recoverIntent(root, intent) {
     repositoryId: binding.repositoryId,
     baseRevision: binding.baseRevision,
     rootTaskId: binding.rootTaskId,
-    idempotencyKey: intent.operationKey,
+    // Intents written before the operation key was scoped carry the bare
+    // idempotency key in operationKey; fall back to it so recovery of an
+    // in-flight spawn still rebuilds the same workspace id.
+    idempotencyKey: intent.idempotencyKey || intent.operationKey,
     workspaceProfile: binding.workspaceProfile || 'cli',
     allowFetch: false,
     leaseTtlMs: null,
@@ -734,6 +754,7 @@ module.exports = {
   WorkspaceError,
   workspaceIdOf,
   ownerKeyOf,
+  operationKeyOf,
   STATUSES,
   CODE_READY,
   NEEDS_REVIEW,
