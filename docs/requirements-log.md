@@ -252,3 +252,41 @@ Design: `docs/PR-AUTOFIX-SERVICE.md` §3. Additive; external write = a PR to the
   окну «свежайший за 60 с» — два близких диспатча получают разные run id, не чужой результат.
 - [планируется] Пачка `ci-setup` на остальные репозитории org `trained-assist` — issue #66
   (первый репозиторий настроен и проверен).
+
+## Z01 — Inventory и общий development baseline (2026-09-30/10-01, pr-autofix#26, архитектура #37)
+
+Карточка Z01 этапа I00. Движок и схема — в `trained-assist/pr-autofix`, коммит coverage-таблицы и
+`coverage-drift` — в `trained-assist/trained-agent-architecture`. Решения и грабли:
+`pr-autofix/docs/changes/2026-10-01-z01-inventory-dev-baseline.md`, живой сценарий:
+`pr-autofix/docs/user-scenarios/onboarding/z01-inventory-dev-baseline.md`.
+
+- [реализовано] Движок и CLI в `pr-autofix`: `validate`, `verify`, `context`, `inventory`,
+  `check-docs`, `check-workflows`, `run-derived-check` (PR #27, merge `335e7601`).
+- [реализовано] Схемы профиля и адаптера + пять профилей (`docs`/`node`/`python`/`mixed`/`minimal`);
+  профиль выводится деривацией, `.devbaseline.json` необязателен и закрепляет недеривируемое.
+- [реализовано] `inventory`: 18 колонок, 25 репозиториев, 0 unreadable; нечитаемый репозиторий —
+  строка `unreadable` с причиной и код `0` по умолчанию, `--strict` даёт `4`; generation отказывается
+  писать файл, если в строке есть значение credential (AC-40, AC-07).
+- [реализовано] Log-контракт AC-44 расширен аддитивно: `violations[{rule_id, path, message}]`,
+  `included/omitted paths`, фактический расход бюджета; `rule_id` (нарушенное правило) отделён от
+  `reason_code` (почему движок остановился); молчащий check правило не выдумывает.
+- [реализовано] Fixture `fixtures/onboarding-repo/` с намеренными дефектами; песочница
+  `scripts/sandbox/z01-devbaseline.mjs` — 102 ok / 0 FAIL; controlled failure, no-change повтор и
+  отказ по cap проверяются офлайн, без сети.
+- [реализовано] Callable `devbaseline-callable.yml` (`ci` | `staging-gate`) и настоящий
+  `ci-fix-cleanup.yml` с `on: workflow_call` (R26 закрыт, ловится `check-workflows`).
+- [реализовано] Собственный `ci.yml` pr-autofix получил job `staging-gate`: merge в этом репозитории
+  проверяет не только self-test, а репетицию боевого пути на fixture.
+- [реализовано] Три дефекта, найденные на живой проверке сценария, закрыты кодом движка (PR #28,
+  merge `7be6309`): единый источник скана вместо двух реализаций, staging по джобам в тексте
+  workflow, а не по имени файла; плюс входная валидация идентификатора репозитория.
+- [отклонено (почему)] Командный перенос таблицы покрытия в этот репозиторий: таблицей владеет
+  `trained-agent-architecture`, второй экземпляр таблицы был бы источником расхождения.
+- [планируется] Установка `ci`/`staging-gate`/AutoFix в чужие репозитории + процедура `setup`
+  (владелец — playbooks, `src/pr-autofix/`). Требует тега pr-autofix, где cleanup callable: версия
+  для потребителя = ref вызывающего workflow (`job.workflow_sha`), поэтому установщик обязан
+  отвергать ref без callable-cleanup.
+- [планируется] Коммит coverage-таблицы и джоб `coverage-drift` в `trained-agent-architecture`
+  (владелец — архитектура); применение construction tasks — только с `--apply` после ревью списка.
+- [планируется] Компрессия контекста (builder) — Z03; Z01 даёт контракт профиля и состояния
+  манифеста (`fresh`/`stale`/`missing`), сам builder не строит.
