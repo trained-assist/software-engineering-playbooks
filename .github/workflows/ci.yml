@@ -35,3 +35,21 @@ jobs:
             echo "Agent version: $(cd /tmp/agent && git rev-parse --short HEAD)"
             exit 1
           }
+
+  staging-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: trained-assist/pr-autofix
+          ref: 2a1a7c78ef21371315f50c61428d391ba5b40e8b
+          path: .sandbox/pinned-tool
+          persist-credentials: false
+      - name: Setup, repeat, evidence and teardown against a bare endpoint
+        env:
+          PR_AUTOFIX_PINNED_DIR: ${{ github.workspace }}/.sandbox/pinned-tool
+        run: node --test tests/pr-autofix-bare.test.js tests/pr-autofix-setup.test.js

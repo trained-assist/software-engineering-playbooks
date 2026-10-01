@@ -66,7 +66,7 @@ function fake({ base = 'main', repo = 'trained-assist/demo', defaultBranch = nul
         const ok = callableRefs === null || callableRefs.includes(ref);
         const fp = decodeURIComponent(m[3]);
         if (!ok || !CALLABLES.includes(fp)) return { status: 404, ok: false, data: { message: 'Not Found' } };
-        return { status: 200, ok: true, data: { content: b64('# callable\n'), sha: 'blob:tool' } };
+        return { status: 200, ok: true, data: { content: b64('on:\n  workflow_call:\n'), sha: 'blob:tool' } };
       }
       const fp = decodeURIComponent(m[3]);
       if (upper === 'GET') {
@@ -270,4 +270,14 @@ test('no code path stores or prints credential material', () => {
   ].join('\n');
   assert.ok(!/ghp_[A-Za-z0-9]{10}/.test(src), 'no hard-coded token');
   assert.ok(!/console\.(log|stdout)\([^)]*ghToken/.test(src), 'ghToken is never printed');
+});
+
+test('a present but non-callable cleanup is rejected before installation', async () => {
+  const gh = fake();
+  const original = gh.ghFetch;
+  gh.ghFetch = async (...args) => args[1].includes('/ci-fix-cleanup.yml')
+    ? { ok: true, status: 200, data: { content: b64('on:\n  push:\n') } }
+    : original(...args);
+  await assert.rejects(() => assertRefCallable(gh, 'v1.7.4'), { code: 'REF_NOT_CALLABLE' });
+  assert.equal(gh.state.shaSeq, 0);
 });

@@ -184,7 +184,12 @@ async function assertRefCallable(github, ref, { required = REQUIRED_CALLABLES } 
       'GET',
       `/repos/${AUTOFIX_OWNER}/contents/${rel}?ref=${encodeURIComponent(ref)}`,
     );
-    if (res.ok) continue;
+    const text = res.ok && typeof res.data?.content === 'string'
+      ? Buffer.from(res.data.content.replace(/\n/g, ''), 'base64').toString('utf8') : '';
+    // Accept the block/inline forms emitted by our pinned workflows, fail closed otherwise.
+    const onBlock = text.match(/^(?:on|'on'|"on"):\s*\n((?:[ \t]+[^\n]*\n|\n)*)/m);
+    if (res.ok && ((onBlock && /^  workflow_call\s*:/m.test(onBlock[1]))
+      || /^(?:on|'on'|"on"):\s*(?:workflow_call|\[[^\]\n]*\bworkflow_call\b[^\]\n]*\]|\{\s*workflow_call:.*\})\s*$/m.test(text))) continue;
     fail(
       'REF_NOT_CALLABLE',
       `autofix_ref "${ref}" does not contain ${AUTOFIX_OWNER}/${rel} (HTTP ${res.status}); `
