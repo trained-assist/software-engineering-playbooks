@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: trained-assist/pr-autofix
-          ref: 2a1a7c78ef21371315f50c61428d391ba5b40e8b
+          ref: v1.7.5
           path: .sandbox/pinned-tool
           persist-credentials: false
       - name: Setup, repeat, evidence and teardown against a bare endpoint
