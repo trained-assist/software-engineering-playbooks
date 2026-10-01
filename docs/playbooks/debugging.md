@@ -19,8 +19,8 @@
 | 5 | Причина и план фикса | Декларация плана: GitHub issue | `plan-declaration` | developer · bachelor (дешёвая модель) · small | `issue_created_with_plan` |
 | 6 | Фикс | Реализация в изолированном workspace | `implement` | developer · master (сильная дешёвая) · large | `implementation_complete_and_sandbox_green` |
 | 7 | Фикс | Полная локальная проверка | `verify-local` | verifier · bachelor (дешёвая модель) · medium | `local_checks_and_tests_green` |
-| 8 | Фикс | Открыть PR | `open-pr` | developer · bachelor (дешёвая модель) · small | `pr_opened` |
-| 9 | Доставка и подтверждение | CI зелёный (ждём; чиним, если красный) | `ci-green` | developer · bachelor (дешёвая модель) · medium | `ci_green` |
+| 8 | Фикс | Открыть PR | `open-pr` | developer · bachelor (дешёвая модель) · small, уже-выполнено: pr_opened | `pr_opened` |
+| 9 | Доставка и подтверждение | CI зелёный (ждём; чиним, если красный) | `ci-green` | developer · bachelor (дешёвая модель) · medium, уже-выполнено: ci_green | `ci_green` |
 | 10 | Доставка и подтверждение | PR смержен | `merged` | программно, ждёт (опрос 5 мин, таймаут 24 ч) | `merged` |
 | 11 | Доставка и подтверждение | Деплой прошёл и живой | `deployed` | verifier · bachelor (дешёвая модель) · small | `deployed_version_is_live` |
 | 12 | Доставка и подтверждение | Подтвердить, что ошибка ушла в проде | `confirm-fixed` | verifier · bachelor (дешёвая модель) · small | `error_gone_in_production` |

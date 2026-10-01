@@ -68,7 +68,7 @@ function renderInstructions(library, typeId, type, notes, context = REPO_LINE) {
   return parts.join('\n\n');
 }
 
-const STEP_OVERRIDES = ['title', 'validation', 'executor_role', 'minimum_model_level', 'context_budget',
+const STEP_OVERRIDES = ['title', 'validation', 'already_done', 'executor_role', 'minimum_model_level', 'context_budget',
   'execution_timeout_seconds', 'max_attempts', 'delay_after_sec', 'wait', 'on_complete', 'on_fail'];
 
 function buildStep(library, src, context, where) {
@@ -89,7 +89,7 @@ function buildStep(library, src, context, where) {
     step.context_budget = merged.context_budget;
   }
   step.validation = merged.validation;
-  for (const key of ['delay_after_sec', 'max_attempts', 'execution_timeout_seconds', 'wait', 'on_complete', 'on_fail']) {
+  for (const key of ['already_done', 'delay_after_sec', 'max_attempts', 'execution_timeout_seconds', 'wait', 'on_complete', 'on_fail']) {
     if (merged[key] !== undefined) step[key] = merged[key];
   }
   return step;
@@ -133,10 +133,11 @@ const levelNote = step => (step.executor_role === 'reviewer' && step.minimum_mod
   ? 'Codex — другая семья моделей, не Claude' : LEVEL_NOTE[step.minimum_model_level]);
 
 function contractCell(step) {
+  const skip = step.already_done ? `, уже-выполнено: ${Object.keys(step.already_done).join(', ')}` : '';
   if (step.execution_kind === 'programmatic') {
-    return `программно${step.wait ? `, ждёт (опрос ${step.wait.poll_every_sec / 60} мин, таймаут ${Math.round(step.wait.timeout_sec / 3600)} ч)` : ''}`;
+    return `программно${step.wait ? `, ждёт (опрос ${step.wait.poll_every_sec / 60} мин, таймаут ${Math.round(step.wait.timeout_sec / 3600)} ч)` : ''}${skip}`;
   }
-  return `${step.executor_role} · ${step.minimum_model_level} (${levelNote(step)}) · ${step.context_budget}`;
+  return `${step.executor_role} · ${step.minimum_model_level} (${levelNote(step)}) · ${step.context_budget}${skip}`;
 }
 
 function renderPlaybookDoc(library, src, built) {

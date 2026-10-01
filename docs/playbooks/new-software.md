@@ -23,8 +23,8 @@
 | 8 | Песочница и каркас | Каркас репозитория | `repo-bootstrap` | developer · bachelor (дешёвая модель) · medium | `repo_bootstrapped_with_ci_and_docs` |
 | 9 | Ходячий скелет | Ходячий скелет: ключевой сценарий end-to-end | `implement` | developer · master (сильная дешёвая) · large | `implementation_complete_and_sandbox_green` |
 | 10 | Ходячий скелет | Полная локальная проверка | `verify-local` | verifier · bachelor (дешёвая модель) · medium | `local_checks_and_tests_green` |
-| 11 | Ходячий скелет | Открыть PR | `open-pr` | developer · bachelor (дешёвая модель) · small | `pr_opened` |
-| 12 | В реальное окружение | CI зелёный (ждём; чиним, если красный) | `ci-green` | developer · bachelor (дешёвая модель) · medium | `ci_green` |
+| 11 | Ходячий скелет | Открыть PR | `open-pr` | developer · bachelor (дешёвая модель) · small, уже-выполнено: pr_opened | `pr_opened` |
+| 12 | В реальное окружение | CI зелёный (ждём; чиним, если красный) | `ci-green` | developer · bachelor (дешёвая модель) · medium, уже-выполнено: ci_green | `ci_green` |
 | 13 | В реальное окружение | PR смержен | `merged` | программно, ждёт (опрос 5 мин, таймаут 24 ч) | `merged` |
 | 14 | В реальное окружение | Из песочницы в реальное окружение | `go-live` | developer · master (сильная дешёвая) · medium | `running_in_real_environment` |
 | 15 | В реальное окружение | Проверка сценария в реальном окружении | `verify-real` | verifier · master (сильная дешёвая) · medium | `user_scenario_verified_in_real_environment` |

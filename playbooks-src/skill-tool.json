@@ -1,6 +1,6 @@
 {
   "id": "skill-tool",
-  "version": 1,
+  "version": 2,
   "scope": "system",
   "title": "Новый MCP-инструмент в доменном скиле",
   "when": "Нужно добавить инструмент (MCP-тул) в существующий доменный скил (hh, sales, documents, freelance, speech, search): конвенции репо скила → файл и схема тула → исполняемый тест хендлера и регистрации → правило в промпт-домене → PR с зелёными CI и staging → деплой ядра → проверка в живой сессии. Обычную фичу или баг в продукте веди `feature`/`debugging`, новый модуль с нуля — `new-software`; изменение ядра или шлюза этот плейбук не покрывает.",
@@ -98,6 +98,7 @@
         {
           "use": "ci-green",
           "validation": { "ci_and_staging_green": true },
+          "already_done": { "ci_and_staging_green": true },
           "notes": [
             "Валидатор ci_and_staging_green, а не ci_green: правило владельца 2026-09-16 — мержу только когда зелёный И CI, И staging на актуальной версии PR; устаревший красный не закрывается молча.",
             "Ветка A: в .github/workflows/ci.yml целевого репо есть job staging-gate → жди оба через durable wait по ключу ci_and_staging_green с ссылкой на PR.",

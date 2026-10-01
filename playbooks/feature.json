@@ -1,6 +1,6 @@
 {
   "id": "feature",
-  "version": 1,
+  "version": 2,
   "scope": "system",
   "title": "Фича или изменение в существующем продукте",
   "goal_template": "{goal}",
@@ -162,6 +162,9 @@
           "validation": {
             "pr_opened": true
           },
+          "already_done": {
+            "pr_opened": true
+          },
           "execution_timeout_seconds": 600,
           "on_complete": [
             {
@@ -186,6 +189,9 @@
           "minimum_model_level": "bachelor",
           "context_budget": "medium",
           "validation": {
+            "ci_green": true
+          },
+          "already_done": {
             "ci_green": true
           },
           "execution_timeout_seconds": 1200

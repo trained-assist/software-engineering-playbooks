@@ -16,8 +16,8 @@
 | # | Стадия | Шаг | Тип | Исполнитель | Проверка |
 |---|---|---|---|---|---|
 | 1 | Разбор репозитория и настройка workflow | Настроить ручной прогон тестов в репозитории | `ci-setup` | developer · master (сильная дешёвая) · medium | `ci_workflow_configured` |
-| 2 | PR: открыть, довести до зелёного, слить | Открыть PR | `open-pr` | developer · bachelor (дешёвая модель) · small | `pr_opened` |
-| 3 | PR: открыть, довести до зелёного, слить | CI зелёный (ждём; чиним, если красный) | `ci-green` | developer · bachelor (дешёвая модель) · medium | `ci_green` |
+| 2 | PR: открыть, довести до зелёного, слить | Открыть PR | `open-pr` | developer · bachelor (дешёвая модель) · small, уже-выполнено: pr_opened | `pr_opened` |
+| 3 | PR: открыть, довести до зелёного, слить | CI зелёный (ждём; чиним, если красный) | `ci-green` | developer · bachelor (дешёвая модель) · medium, уже-выполнено: ci_green | `ci_green` |
 | 4 | PR: открыть, довести до зелёного, слить | PR смержен | `merged` | программно, ждёт (опрос 5 мин, таймаут 24 ч) | `merged` |
 | 5 | Проверка и объяснение простыми словами | Проверка сценария в реальном окружении | `verify-real` | verifier · master (сильная дешёвая) · medium | `user_scenario_verified_in_real_environment` |
 
