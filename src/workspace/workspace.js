@@ -319,6 +319,7 @@ function completeProvision({ b, resolvedBase, fingerprint, workspaceId, layout, 
   // now, otherwise status() keeps reporting the base revision and fingerprint of
   // a lease that no longer exists.
   if (previousLeaseFinished) {
+    record.branch = layout.branch;
     record.baseRevision = resolvedBase;
     record.operationFingerprint = fingerprint;
   }
@@ -416,6 +417,8 @@ function spawnWorkspace(binding, options = {}) {
         });
       }
       const existingOwner = readOwner(b.workspaceRoot, ownerKey);
+      const intent = readIntent(b.workspaceRoot, op.workspaceId || workspaceId);
+      if (intent?.branch) layout.branch = intent.branch;
       return completeProvision({
         b,
         resolvedBase,
@@ -437,6 +440,14 @@ function spawnWorkspace(binding, options = {}) {
       });
     }
     const nextLease = (owner && owner.leaseGeneration ? owner.leaseGeneration : 0) + 1;
+    // A label identifies a task; each publication needs its own immutable branch.
+    // Preserve the prior lease before replacing the stable task lookup record.
+    const previous = loadWorkspace(b.workspaceRoot, workspaceId);
+    if (previous) {
+      store.writeJsonAtomic(path.join(store.storeRoot(b.workspaceRoot), 'history', workspaceId,
+        `lease-${previous.leaseGeneration || 1}.json`), previous);
+    }
+    if (nextLease > 1) layout.branch += `-lease-${nextLease}`;
 
     writeOperation(b.workspaceRoot, operationKey, {
       operationKey,

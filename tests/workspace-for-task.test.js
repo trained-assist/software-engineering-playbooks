@@ -140,7 +140,12 @@ test('a released task label can be spawned again: new lease, current base revisi
   assert.equal(second.status, 'code_ready');
   assert.equal(second.workspaceId, first.workspaceId);
   assert.equal(second.codePath, first.codePath);
-  assert.equal(second.branch, first.branch);
+  assert.notEqual(second.branch, first.branch);
+  assert.equal(second.branch, first.branch + '-lease-2');
+  const historical = JSON.parse(fs.readFileSync(path.join(workspaceRoot, '.engineering-workspaces', 'history', first.workspaceId, 'lease-1.json')));
+  assert.equal(historical.branch, first.branch);
+  assert.equal(historical.status, 'released');
+  assert.equal(runGit(second.codePath, ['branch', '--show-current']).trim(), second.branch);
   // A new lease, based on the base revision as it is NOW — not the stale one
   // the released lease was created from.
   assert.equal(second.leaseGeneration, first.leaseGeneration + 1);
@@ -290,3 +295,31 @@ function makeSourceRepo() {
   runGit(dir, ['commit', '-qm', 'initial']);
   return { dir };
 }
+
+
+test('published merged lease cannot resume and respawn preserves remote branch', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'published', workspaceRoot, mirrorsRoot };
+  const first = spawnWorkspaceForTask(opts);
+  runGit(first.codePath, ['push', 'origin', `HEAD:refs/heads/${first.branch}`]);
+  assert.throws(() => spawnWorkspaceForTask(opts), e => e.code === 'LABEL_BRANCH_MERGED');
+  assert.equal(releaseWorkspaceForTask(opts).status, 'released');
+  const second = spawnWorkspaceForTask(opts);
+  assert.notEqual(second.branch, first.branch);
+  assert.equal(runGit(second.codePath, ['rev-parse', `origin/${first.branch}`]).trim(), first.baseRevision);
+  assert.equal(second.baseRevision, first.baseRevision);
+  assert.equal(spawnWorkspaceForTask(opts).branch, second.branch);
+  assert.equal(statusWorkspaceForTask(opts).branch, second.branch);
+  assert.equal(releaseWorkspaceForTask(opts).status, 'released');
+});
+
+test('branch metadata mismatch refuses resume without changing work', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'mismatch', workspaceRoot, mirrorsRoot };
+  const first = spawnWorkspaceForTask(opts);
+  runGit(first.codePath, ['checkout', '-b', 'foreign-work']);
+  assert.throws(() => spawnWorkspaceForTask(opts), e => e.code === 'LABEL_BRANCH_MISMATCH');
+  assert.equal(runGit(first.codePath, ['branch', '--show-current']).trim(), 'foreign-work');
+});

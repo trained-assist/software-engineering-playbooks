@@ -91,7 +91,26 @@ function spawnWorkspaceForTask({
   if (fs.existsSync(workspaceRoot)) {
     const workspaceId = taskWorkspaceId({ principal, repositoryUrl, repositoryId, rootTaskId });
     const existing = statusWorkspace({ workspaceRoot, workspaceId, principal, rootTaskId });
-    if (existing.found && existing.status === CODE_READY) return { ...existing, reused: true, recovered: false };
+    if (existing.found && existing.status === CODE_READY) {
+      const actualBranch = git.git(['branch', '--show-current'], existing.codePath).stdout;
+      if (actualBranch !== existing.branch) {
+        fail('LABEL_BRANCH_MISMATCH', 'workspace branch differs from lease metadata; retained for review',
+          { branch: existing.branch, actualBranch, workspaceId });
+      }
+      // Old lifecycle versions reissued the original branch for generation 2+.
+      if (existing.leaseGeneration > 1 && !existing.branch.endsWith(`-lease-${existing.leaseGeneration}`)) {
+        fail('LABEL_BRANCH_MERGED', 'legacy lease reused a publication branch; release it before respawning',
+          { branch: existing.branch, leaseGeneration: existing.leaseGeneration, workspaceId });
+      }
+      const mirror = ensureMirror(repositoryUrl, mirrorsRoot);
+      const base = resolveBaseRevision(mirror);
+      const published = git.resolveCommit(mirror, `refs/remotes/origin/${existing.branch}`);
+      if (published && base && git.isMergedInto(mirror, published, base)) {
+        fail('LABEL_BRANCH_MERGED', 'published branch is already merged; release it before respawning',
+          { branch: existing.branch, publishedRevision: published, workspaceId });
+      }
+      return { ...existing, reused: true, recovered: false };
+    }
   }
 
   const sourceCheckout = ensureMirror(repositoryUrl, mirrorsRoot);
