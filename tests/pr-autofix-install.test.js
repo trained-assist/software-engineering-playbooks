@@ -60,7 +60,24 @@ function register(profileId, root, overrides = {}) {
 
 // --- In-memory GitHub ---------------------------------------------------------
 
-function makeFakeGithub({ base = 'main', repo = 'trained-assist/demo', files = {} } = {}) {
+// The pr-autofix repository itself, as the installer sees it: a `contents` lookup for the
+// reusable workflows it is about to reference. `callableRefs` decides which refs actually
+// contain them — an empty/missing ref is exactly how an install against a too-old pin used
+// to produce a workflow GitHub could not resolve, and the guard must be able to see that.
+const TOOL_REPO = 'trained-assist/pr-autofix';
+const TOOL_CALLABLES = [
+  '.github/workflows/autofix-callable.yml',
+  '.github/workflows/ci-fix-cleanup.yml',
+];
+
+function makeFakeGithub({
+  base = 'main',
+  repo = 'trained-assist/demo',
+  files = {},
+  defaultBranch = null,
+  workflowNames = ['CI'],
+  callableRefs = null, // null => every ref is callable
+} = {}) {
   const state = {
     refs: { [base]: 'sha0' },
     snapshots: { sha0: { ...files } },
@@ -80,6 +97,37 @@ function makeFakeGithub({ base = 'main', repo = 'trained-assist/demo', files = {
     const route = url.pathname;
     const q = url.searchParams;
     let m;
+
+    // Tool-repository reads: callables at a ref, plus the repo's own metadata for autodetect.
+    if (m = route.match(/^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/)) {
+      if (`${m[1]}/${m[2]}` === TOOL_REPO && upper === 'GET') {
+        const ref = q.get('ref');
+        const ok = callableRefs === null || callableRefs.includes(ref);
+        const filePath = decodeURIComponent(m[3]);
+        if (!ok || !TOOL_CALLABLES.includes(filePath)) {
+          return { status: 404, ok: false, data: { message: 'Not Found' } };
+        }
+        return { status: 200, ok: true, data: { content: b64('# callable\n'), sha: 'blob:tool' } };
+      }
+    }
+    if (upper === 'GET' && (m = route.match(/^\/repos\/([^/]+)\/([^/]+)$/))) {
+      if (`${m[1]}/${m[2]}` === repo) {
+        return {
+          status: 200,
+          ok: true,
+          data: { default_branch: defaultBranch || base, name: m[2], full_name: repo },
+        };
+      }
+    }
+    if (upper === 'GET' && (m = route.match(/^\/repos\/([^/]+)\/([^/]+)\/actions\/workflows$/))) {
+      if (`${m[1]}/${m[2]}` === repo) {
+        return {
+          status: 200,
+          ok: true,
+          data: { workflows: workflowNames.map((n) => ({ name: n, path: `.github/workflows/${String(n).toLowerCase()}.yml` })) },
+        };
+      }
+    }
 
     if (upper === 'GET' && (m = route.match(/^\/repos\/([^/]+)\/([^/]+)\/git\/ref\/heads\/(.+)$/))) {
       const branch = decodeURIComponent(m[3]);
