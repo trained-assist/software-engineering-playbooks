@@ -104,6 +104,65 @@ test('resume still reuses the workspace after the default branch moved on the re
   assert.equal(second.baseRevision, first.baseRevision);
 });
 
+// Release ends the LEASE, not the label. A task label stays reusable: the next
+// spawn for it must get a fresh worktree on the CURRENT base revision, as a new
+// lease generation. Regression: spawn() compared the operation fingerprint
+// (which contains the resolved base revision) against the record left behind by
+// the released lease, so every repeat spawn after release failed CONFLICT
+// "idempotency key was already used with incompatible arguments" — the label was
+// burnt for good and the whole plan could never touch its repository again.
+test('a released task label can be spawned again: new lease, current base revision', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'plan-card-z01', workspaceRoot, mirrorsRoot };
+
+  const first = spawnWorkspaceForTask(opts);
+
+  const work = tmp('eng-remote-after-release-');
+  runGit(work, ['clone', '-q', repositoryUrl, '.']);
+  runGit(work, ['config', 'user.email', 'test@example.com']);
+  runGit(work, ['config', 'user.name', 'Test']);
+
+  const advance = (file, message) => {
+    fs.writeFileSync(path.join(work, file), `${message}\n`);
+    runGit(work, ['add', '.']);
+    runGit(work, ['commit', '-qm', message]);
+    runGit(work, ['push', '-q', 'origin', 'HEAD:main']);
+  };
+
+  advance('ONE.md', 'first advance');
+  const released = releaseWorkspaceForTask({ ...opts, deliveryEvidence: { merged: true, evidence: 'merge commit' } });
+  assert.equal(released.status, 'released');
+  advance('TWO.md', 'second advance');
+
+  const second = spawnWorkspaceForTask(opts);
+
+  assert.equal(second.status, 'code_ready');
+  assert.equal(second.workspaceId, first.workspaceId);
+  assert.equal(second.codePath, first.codePath);
+  assert.equal(second.branch, first.branch);
+  // A new lease, based on the base revision as it is NOW — not the stale one
+  // the released lease was created from.
+  assert.equal(second.leaseGeneration, first.leaseGeneration + 1);
+  assert.notEqual(second.baseRevision, first.baseRevision);
+  assert.equal(runGit(second.codePath, ['rev-parse', 'HEAD']).trim(), second.baseRevision);
+});
+
+// The guard that must survive the fix above: while a lease is LIVE, one
+// operation key reused for a different task in the same repository is a caller
+// bug and must still be refused. Only a finished lease is reusable.
+test('a live lease still refuses a second task under the same operation key', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'live-lease', workspaceRoot, mirrorsRoot };
+
+  spawnWorkspaceForTask(opts);
+  spawnWorkspaceForTask({ ...opts, repositoryUrl, rootTaskId: 'live-lease-2' });
+
+  assert.equal(statusWorkspaceForTask({ ...opts, rootTaskId: 'live-lease' }).status, 'code_ready');
+  assert.equal(statusWorkspaceForTask({ ...opts, rootTaskId: 'live-lease-2' }).status, 'code_ready');
+});
+
 test('a branch already occupying the target name is an explicit collision, not a silent takeover', () => {
   const repositoryUrl = makeRemote();
   const { workspaceRoot, mirrorsRoot } = env();
