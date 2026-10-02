@@ -1,6 +1,6 @@
 'use strict';
 
-const { registerAutofix, statusAutofix, disableAutofix, installAutofixWorkflow } = require('../../pr-autofix');
+const { registerAutofix, statusAutofix, disableAutofix, installAutofixWorkflow, rolloutAutofix } = require('../../pr-autofix');
 
 // `profileId` is host-derived identity (USER_ID), never a tool-call argument —
 // same rule as the workspace and qa-log tools, so an argument cannot redirect
@@ -97,4 +97,34 @@ const disable = {
   },
 };
 
-module.exports = [register, install, status, disable];
+const rollout = {
+  name: 'engineering_pr_autofix_rollout',
+  description: 'One-command rollout of the pr-autofix workflow across repositories (issue #95). Registers what is missing, installs with the org-known-good ref, and returns a per-repo status table where every repository appears with the reason it was skipped. Pass repos for an explicit list, or omit it to use the org inventory. EXTERNAL WRITE: opens install PRs in every target repository and requires a host GitHub token. dryRun plans every repository and writes nothing.',
+  inputSchema: {
+    type: 'object',
+    required: [],
+    properties: {
+      repos: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Explicit "owner/name" list. Defaults to the org inventory when omitted.',
+      },
+      autofix_ref: { type: 'string', description: 'Immutable pr-autofix tag to pin. Defaults to the org-known-good ref; the defective v1.7.4…v1.7.7 window is refused.' },
+      ci_workflow_name: { type: 'string', description: 'Force the watched CI workflow name instead of detecting it per repository.' },
+      dryRun: { type: 'boolean', description: 'Plan only: no registration write, no install PR.' },
+    },
+  },
+  handler: async ({ repos, autofix_ref, ci_workflow_name, dryRun } = {}) => {
+    const { profileId, root } = context();
+    return rolloutAutofix({
+      profileId,
+      root,
+      repos,
+      autofix_ref,
+      ci_workflow_name,
+      dryRun: Boolean(dryRun),
+    });
+  },
+};
+
+module.exports = [register, install, rollout, status, disable];

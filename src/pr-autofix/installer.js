@@ -507,5 +507,6 @@ module.exports = {
   assertRefCallable,
   autodetectRepoDefaults,
   buildWorkflowFiles,
+  filesMatch,
   installAutofixWorkflow,
 };
