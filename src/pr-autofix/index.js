@@ -6,4 +6,5 @@ module.exports = {
   ...require('./registry'),
   ...require('./installer'),
   ...require('./setup'),
+  ...require('./rollout'),
 };
