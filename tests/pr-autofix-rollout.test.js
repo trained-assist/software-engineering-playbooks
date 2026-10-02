@@ -1,10 +1,10 @@
 'use strict';
 
 // Issue #95 — the one-command rollout. Driven by an in-memory GitHub capability so
-// nothing here touches the network. Covers: the plan/execute split (`--dry-run` writes
+// nothing here touches the network. Covers: the plan/execute split (`dryRun` writes
 // nothing), registration not being a hidden prerequisite, the known-good ref default,
-// the defective-window refusal, CI workflow name detection, the no-CI skip, the
-// self-repo skip, and the already-installed no-op.
+// the defective-window refusal, the no-CI skip, the self-repo skip, the already
+// installed no-op, and a non-`main` default branch.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -13,14 +13,12 @@ const os = require('os');
 const path = require('path');
 const {
   registerAutofix,
-  setGithubCapabilityFactory,
   rolloutAutofix,
-  detectCiWorkflow,
-  workflowNameFromContent,
   normalizeRepoList,
   ROLLOUT_DEFAULT_AUTOFIX_REF,
   PrAutofixError,
 } = require('../src/pr-autofix');
+const { buildWorkflowFiles } = require('../src/pr-autofix/installer');
 
 const cleanup = [];
 const savedEnv = {};
@@ -29,7 +27,6 @@ for (const key of ['USER_ID', 'ENGINEERING_PR_AUTOFIX_ROOT', 'ENGINEERING_GITHUB
 }
 
 test.after(() => {
-  setGithubCapabilityFactory(null);
   for (const key of Object.keys(savedEnv)) {
     if (savedEnv[key] === undefined) delete process.env[key];
     else process.env[key] = savedEnv[key];
@@ -46,25 +43,16 @@ function tmp(prefix) {
 // --- In-memory GitHub ---------------------------------------------------------
 
 const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
+const CALLABLE = 'on:\n  workflow_call:\njobs:\n  x:\n    runs-on: ubuntu-latest\n';
 
-// A small org: each repository has a default branch and a set of workflow files.
-// `files` maps a path to its content; workflow paths are exposed both through the
-// directory listing and through the per-file read, exactly as the real API does.
-function makeOrg({ repos = {} } = {}) {
-  const state = {
-    repos,
-    pulls: [],
-    prSeq: 0,
-    shaSeq: 0,
-    calls: [],
-  };
-
-  const workflowsOf = (repo) => Object.keys(repos[repo].files)
-    .filter((p) => p.startsWith('.github/workflows/'))
-    .sort();
-  const contentOf = (repo, filePath) => {
-    const value = repos[repo].files[filePath];
-    return value === undefined ? null : value;
+// Each repository has a default branch and a list of workflows as GitHub's
+// `actions/workflows` endpoint reports them: `{ name, path }`. The tool repo answers
+// the installer's callability preflight, so the fake serves it too.
+function makeOrg({ repos = {}, callableRefs = ['v1.7.8', 'v1.7.9', 'v1.8.0'], inventory = null } = {}) {
+  const state = { repos, callableRefs, inventory, pulls: [], prSeq: 0, shaSeq: 0, calls: [] };
+  const repoOf = (route) => {
+    const m = route.match(/^\/repos\/([^/]+)\/([^/]+)\//);
+    return m ? `${m[1]}/${m[2]}` : null;
   };
 
   async function ghFetch(method, endpoint, body) {
@@ -75,33 +63,46 @@ function makeOrg({ repos = {} } = {}) {
     const q = url.searchParams;
     let m;
 
+    // The tool repo: does this ref expose the reusable workflows the install pins?
+    if (upper === 'GET' && route.startsWith('/repos/trained-assist/pr-autofix/')) {
+      const ref = q.get('ref') || '';
+      if (state.callableRefs.includes(ref)) {
+        return { status: 200, ok: true, data: { content: b64(CALLABLE), sha: `blob:${route}` } };
+      }
+      return { status: 404, ok: false, data: { message: 'Not Found' } };
+    }
+
+    // The org inventory the rollout reads when no repo list is passed.
+    if (upper === 'GET' && route === '/repos/trained-assist/trained-agent-architecture/contents/docs/inventory/repo-coverage.json') {
+      if (!state.inventory) return { status: 404, ok: false, data: { message: 'Not Found' } };
+      return { status: 200, ok: true, data: { content: b64(JSON.stringify(state.inventory)) } };
+    }
+
     if (upper === 'GET' && /^\/repos\/[^/]+\/[^/]+$/.test(route)) {
       const repo = route.slice('/repos/'.length);
       if (!repos[repo]) return { status: 404, ok: false, data: { message: 'Not Found' } };
       return { status: 200, ok: true, data: { default_branch: repos[repo].default_branch } };
     }
 
+    if (upper === 'GET' && (m = route.match(/^\/repos\/[^/]+\/[^/]+\/actions\/workflows$/))) {
+      const repo = repoOf(route);
+      if (!repos[repo]) return { status: 404, ok: false, data: { message: 'Not Found' } };
+      return { status: 200, ok: true, data: { workflows: repos[repo].workflows } };
+    }
+
     if (upper === 'GET' && (m = route.match(/^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/))) {
       const repo = `${m[1]}/${m[2]}`;
       const filePath = decodeURIComponent(m[3]);
       if (!repos[repo]) return { status: 404, ok: false, data: { message: 'Not Found' } };
-      if (filePath === '.github/workflows') {
-        return {
-          status: 200,
-          ok: true,
-          data: workflowsOf(repo).map((p) => ({ name: p.split('/').pop(), type: 'file' })),
-        };
-      }
-      const content = contentOf(repo, filePath);
-      if (content === null) return { status: 404, ok: false, data: { message: 'Not Found' } };
+      const content = repos[repo].files[filePath];
+      if (content === undefined) return { status: 404, ok: false, data: { message: 'Not Found' } };
       return { status: 200, ok: true, data: { content: b64(content), sha: `blob:${filePath}` } };
     }
 
-    if ((m = route.match(/^\/repos\/([^/]+)\/([^/]+)\/git\/ref\/heads\/(.+)$/))) {
+    if (upper === 'GET' && (m = route.match(/^\/repos\/([^/]+)\/([^/]+)\/git\/ref\/heads\/(.+)$/))) {
       const repo = `${m[1]}/${m[2]}`;
       const branch = decodeURIComponent(m[3]);
-      if (!repos[repo]) return { status: 404, ok: false, data: { message: 'Not Found' } };
-      if (!repos[repo].refs[branch]) return { status: 404, ok: false, data: { message: 'Not Found' } };
+      if (!repos[repo] || !repos[repo].refs[branch]) return { status: 404, ok: false, data: { message: 'Not Found' } };
       return { status: 200, ok: true, data: { object: { sha: repos[repo].refs[branch] } } };
     }
     if (upper === 'PATCH' && (m = route.match(/^\/repos\/([^/]+)\/([^/]+)\/git\/refs\/heads\/(.+)$/))) {
@@ -112,8 +113,7 @@ function makeOrg({ repos = {} } = {}) {
       return { status: 200, ok: true, data: { object: { sha: body.sha } } };
     }
     if (upper === 'POST' && /\/git\/refs$/.test(route)) {
-      const m2 = route.match(/^\/repos\/([^/]+)\/([^/]+)\//);
-      const repo = `${m2[1]}/${m2[2]}`;
+      const repo = repoOf(route);
       const branch = String(body.ref).replace(/^refs\/heads\//, '');
       if (!repos[repo]) return { status: 404, ok: false, data: { message: 'Not Found' } };
       if (repos[repo].refs[branch]) return { status: 422, ok: false, data: { message: 'Reference already exists' } };
@@ -126,12 +126,15 @@ function makeOrg({ repos = {} } = {}) {
       const filePath = decodeURIComponent(m[3]);
       if (!repos[repo]) return { status: 404, ok: false, data: { message: 'Not Found' } };
       const branch = body.branch;
-      const current = contentOf(repo, filePath);
-      if (current !== null && current !== undefined && !body.sha) {
+      const current = repos[repo].files[filePath];
+      if (current !== undefined && !body.sha) {
         return { status: 422, ok: false, data: { message: 'Invalid request.\n\n"sha" wasn\'t supplied.' } };
       }
       const sha = `sha${++state.shaSeq}`;
-      repos[repo].snapshots[sha] = { ...repos[repo].snapshots[repos[repo].refs[branch]], [filePath]: Buffer.from(body.content, 'base64').toString('utf8') };
+      repos[repo].snapshots[sha] = {
+        ...repos[repo].snapshots[repos[repo].refs[branch]],
+        [filePath]: Buffer.from(body.content, 'base64').toString('utf8'),
+      };
       repos[repo].refs[branch] = sha;
       return { status: 200, ok: true, data: { content: { sha }, commit: { sha } } };
     }
@@ -145,10 +148,8 @@ function makeOrg({ repos = {} } = {}) {
       return { status: 200, ok: true, data: items };
     }
     if (upper === 'POST' && /\/pulls$/.test(route)) {
-      const m2 = route.match(/^\/repos\/([^/]+)\/([^/]+)\//);
-      const repo = `${m2[1]}/${m2[2]}`;
+      const repo = repoOf(route);
       const number = ++state.prSeq;
-      const owner = repo.split('/')[0];
       const pr = {
         number,
         html_url: `https://github.com/${repo}/pull/${number}`,
@@ -157,7 +158,7 @@ function makeOrg({ repos = {} } = {}) {
         body: body.body,
         head: { ref: body.head },
         base: { ref: body.base },
-        user: { login: owner },
+        user: { login: repo.split('/')[0] },
       };
       state.pulls.push(pr);
       return { status: 201, ok: true, data: pr };
@@ -181,80 +182,37 @@ function makeOrg({ repos = {} } = {}) {
   };
 }
 
-function repoFixture({ defaultBranch = 'main', workflows = {} } = {}) {
-  const files = {};
-  for (const [name, content] of Object.entries(workflows)) files[`.github/workflows/${name}`] = content;
+const CI_WORKFLOW = { name: 'CI', path: '.github/workflows/ci.yml' };
+
+// A workflow entry the rollout can read back: the `actions/workflows` listing reports
+// the name and path, and the contents endpoint must serve a file that actually runs on
+// pull requests — otherwise the rollout skips the repository as `ci_not_pull_request`.
+function workflowFile(entry) {
+  if (entry.content !== undefined) return entry.content;
+  return `name: ${entry.name}\non:\n  pull_request:\n  push:\n    branches: [main]\njobs:\n  ci:\n    runs-on: ubuntu-latest\n`;
+}
+
+function repoFixture({ defaultBranch = 'main', workflows = [CI_WORKFLOW], files = {} } = {}) {
+  const materialized = { ...files };
+  for (const entry of workflows) {
+    const path = entry.path || '.github/workflows/ci.yml';
+    if (materialized[path] === undefined) materialized[path] = workflowFile(entry);
+  }
   return {
     default_branch: defaultBranch,
-    files,
+    workflows,
+    files: materialized,
     refs: { [defaultBranch]: 'sha0' },
-    snapshots: { sha0: { ...files } },
+    snapshots: { sha0: { ...materialized } },
   };
 }
 
-const CI_WORKFLOW = 'name: CI\non:\n  pull_request:\njobs:\n  ci:\n    runs-on: ubuntu-latest\n';
+const stored = (root) => JSON.parse(fs.readFileSync(path.join(root, 'tester.json'), 'utf8'));
 
-// --- Detection ----------------------------------------------------------------
+// --- Helpers ------------------------------------------------------------------
 
-test('workflowNameFromContent reads only the top-level name', () => {
-  assert.equal(workflowNameFromContent('name: CI\non:\n  pull_request:\n'), 'CI');
-  assert.equal(workflowNameFromContent('name: "CI + Deploy"\n'), 'CI + Deploy');
-  assert.equal(workflowNameFromContent('on:\n  pull_request:\njobs:\n  ci:\n    name: CI\n'), null);
-  assert.equal(workflowNameFromContent(''), null);
-});
-
-test('detectCiWorkflow finds the workflow whose name matches, not the first file', async () => {
-  const org = makeOrg({
-    repos: {
-      'trained-assist/demo': repoFixture({
-        workflows: {
-          'aaa-first.yml': 'name: Release\non:\n  push:\n',
-          'ci.yml': CI_WORKFLOW,
-        },
-      }),
-    },
-  });
-  const found = await detectCiWorkflow(org.github, 'trained-assist/demo', 'CI');
-  assert.equal(found.name, 'CI');
-  assert.equal(found.file, 'ci.yml');
-});
-
-test('detectCiWorkflow returns null when no workflow carries the name', async () => {
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'release.yml': 'name: Release\non:\n' } }) },
-  });
-  assert.equal(await detectCiWorkflow(org.github, 'trained-assist/demo', 'CI'), null);
-});
-
-test('detectCiWorkflow falls back to a pull-request workflow when the preferred name is absent', async () => {
-  const org = makeOrg({
-    repos: {
-      'trained-assist/demo': repoFixture({
-        workflows: {
-          'release.yml': 'name: Release\non:\n  push:\n',
-          'ci.yml': 'name: CI + Deploy\non:\n  pull_request:\n',
-        },
-      }),
-    },
-  });
-  const found = await detectCiWorkflow(org.github, 'trained-assist/demo', {});
-  assert.equal(found.name, 'CI + Deploy');
-  assert.equal(found.file, 'ci.yml');
-  assert.equal(found.matched, 'fallback');
-});
-
-test('detectCiWorkflow returns null when nothing runs on pull requests', async () => {
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'release.yml': 'name: Release\non:\n  push:\n' } }) },
-  });
-  assert.equal(await detectCiWorkflow(org.github, 'trained-assist/demo', {}), null);
-});
-
-test('an explicit ci_workflow_name is never silently replaced by the fallback', async () => {
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'ci.yml': 'name: CI + Deploy\non:\n  pull_request:\n' } }) },
-  });
-  assert.equal(await detectCiWorkflow(org.github, 'trained-assist/demo', { preferred: 'CI' }), null);
+test('the rollout default ref is the org-known-good v1.7.8', () => {
+  assert.equal(ROLLOUT_DEFAULT_AUTOFIX_REF, 'v1.7.8');
 });
 
 test('normalizeRepoList deduplicates, sorts and rejects a malformed entry', () => {
@@ -263,19 +221,18 @@ test('normalizeRepoList deduplicates, sorts and rejects a malformed entry', () =
   assert.throws(() => normalizeRepoList([]), PrAutofixError);
 });
 
-// --- Rollout ------------------------------------------------------------------
-
-test('the rollout default ref is the org-known-good v1.7.8, not the installer default', () => {
-  assert.equal(ROLLOUT_DEFAULT_AUTOFIX_REF, 'v1.7.8');
-});
+// --- Dry run ------------------------------------------------------------------
 
 test('a dry run plans every repository and writes nothing', async () => {
   const root = tmp('rollout-dry-');
   const org = makeOrg({
     repos: {
-      'trained-assist/has-ci': repoFixture({ workflows: { 'ci.yml': CI_WORKFLOW } }),
-      'trained-assist/no-ci': repoFixture({ workflows: { 'release.yml': 'name: Release\non:\n' } }),
-      'trained-assist/pr-autofix': repoFixture({ workflows: { 'ci.yml': CI_WORKFLOW } }),
+      'trained-assist/has-ci': repoFixture(),
+      'trained-assist/no-ci': repoFixture({
+        workflows: [{ name: 'Release', path: '.github/workflows/release.yml' }],
+        files: { '.github/workflows/release.yml': 'name: Release\non:\n  push:\n    tags: ["v*"]\n' },
+      }),
+      'trained-assist/pr-autofix': repoFixture(),
     },
   });
   const before = org.state.calls.length;
@@ -293,23 +250,18 @@ test('a dry run plans every repository and writes nothing', async () => {
   const byRepo = Object.fromEntries(result.report.map((row) => [row.repo, row]));
   assert.equal(byRepo['trained-assist/has-ci'].status, 'pr_opened');
   assert.equal(byRepo['trained-assist/has-ci'].ciName, 'CI');
-  assert.equal(byRepo['trained-assist/has-ci'].ciMatched, 'exact');
   assert.equal(byRepo['trained-assist/no-ci'].reason, 'no_ci_workflow');
   assert.equal(byRepo['trained-assist/pr-autofix'].reason, 'self');
-  assert.equal(org.writesSince(before).length, 0);
+  assert.equal(org.writesSince(before).length, 0, 'a dry run performs no write at all');
+  assert.equal(fs.existsSync(path.join(root, 'tester.json')), false, 'a dry run does not register anything');
 });
+
+// --- Live rollout -------------------------------------------------------------
 
 test('the live rollout registers a missing repository and opens exactly one PR', async () => {
   const root = tmp('rollout-live-');
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'ci.yml': CI_WORKFLOW } }) },
-  });
-  const result = await rolloutAutofix({
-    profileId: 'tester',
-    root,
-    repos: ['trained-assist/demo'],
-    github: org.github,
-  });
+  const org = makeOrg({ repos: { 'trained-assist/demo': repoFixture() } });
+  const result = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
 
   assert.equal(result.summary.pr_opened, 1);
   const row = result.report[0];
@@ -319,24 +271,22 @@ test('the live rollout registers a missing repository and opens exactly one PR',
   assert.ok(row.pr && row.pr.url.includes('/pull/1'));
 
   // R-17: registration is not a hidden prerequisite — the rollout created it.
-  const stored = JSON.parse(fs.readFileSync(path.join(root, 'tester.json'), 'utf8'));
-  const record = stored.registrations.find((entry) => entry.repo === 'trained-assist/demo');
+  const record = stored(root).registrations.find((entry) => entry.repo === 'trained-assist/demo');
   assert.equal(record.autofix_ref, 'v1.7.8');
   assert.equal(record.ci_workflow_name, 'CI');
   assert.equal(record.base_branch, 'main');
   assert.equal(record.status, 'workflow_installed');
   assert.equal(record.installed_workflow.pinned_ref, 'v1.7.8');
 
-  // The install PR carries both workflow files, pinned.
-  const pr = org.state.pulls[0];
-  assert.match(pr.title, /install pr-autofix workflow \(v1\.7\.8\)/);
-  const written = org.state.calls.filter((call) => call.method === 'PUT');
-  const paths = written.map((call) => new URL(call.endpoint, 'https://x').pathname.split('/').pop());
+  assert.match(org.state.pulls[0].title, /install pr-autofix workflow \(v1\.7\.8\)/);
+  const paths = org.state.calls
+    .filter((call) => call.method === 'PUT')
+    .map((call) => new URL(call.endpoint, 'https://x').pathname.split('/').pop());
   assert.ok(paths.includes('pr-autofix.yml'));
   assert.ok(paths.includes('ci-fix-cleanup.yml'));
 });
 
-test('an existing registration is reused and its install state is preserved', async () => {
+test('an existing registration is reused and not duplicated', async () => {
   const root = tmp('rollout-reuse-');
   registerAutofix({
     profileId: 'tester',
@@ -349,44 +299,23 @@ test('an existing registration is reused and its install state is preserved', as
       features: { fix: true, cleanup: true },
     },
   });
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'ci.yml': CI_WORKFLOW } }) },
-  });
-  const result = await rolloutAutofix({
-    profileId: 'tester',
-    root,
-    repos: ['trained-assist/demo'],
-    github: org.github,
-  });
+  const org = makeOrg({ repos: { 'trained-assist/demo': repoFixture() } });
+  const result = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
 
   assert.equal(result.summary.pr_opened, 1);
-  // No second registration write: the rollout must not duplicate the record.
-  const stored = JSON.parse(fs.readFileSync(path.join(root, 'tester.json'), 'utf8'));
-  assert.equal(stored.registrations.filter((entry) => entry.repo === 'trained-assist/demo').length, 1);
+  assert.equal(stored(root).registrations.filter((entry) => entry.repo === 'trained-assist/demo').length, 1);
 });
 
 test('an identical pinned job already on the base branch is a no-op, not a second PR', async () => {
   const root = tmp('rollout-noop-');
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'ci.yml': CI_WORKFLOW } }) },
-  });
-  // Pre-install the exact files the rollout would write.
-  const { buildWorkflowFiles } = require('../src/pr-autofix/installer');
   const desired = buildWorkflowFiles({
     repo: 'trained-assist/demo',
     autofix_ref: 'v1.7.8',
     ci_workflow_name: 'CI',
     features: { fix: true, cleanup: true },
   });
-  org.repos['trained-assist/demo'].files = { ...org.repos['trained-assist/demo'].files, ...desired };
-  org.repos['trained-assist/demo'].snapshots.sha0 = { ...org.repos['trained-assist/demo'].files };
-
-  const result = await rolloutAutofix({
-    profileId: 'tester',
-    root,
-    repos: ['trained-assist/demo'],
-    github: org.github,
-  });
+  const org = makeOrg({ repos: { 'trained-assist/demo': repoFixture({ files: desired }) } });
+  const result = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
 
   assert.equal(result.summary.installed, 1);
   assert.equal(result.report[0].reason, 'already_pinned');
@@ -395,82 +324,143 @@ test('an identical pinned job already on the base branch is a no-op, not a secon
 
 test('the defective v1.7.4…v1.7.7 window is refused with an explicit error', async () => {
   const root = tmp('rollout-defective-');
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'ci.yml': CI_WORKFLOW } }) },
-  });
+  const org = makeOrg({ repos: { 'trained-assist/demo': repoFixture() } });
   for (const ref of ['v1.7.4', 'v1.7.5', 'v1.7.6', 'v1.7.7']) {
     await assert.rejects(
       rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], autofix_ref: ref, github: org.github }),
-      (error) => error.code === 'DEFECTIVE_AUTOFIX_REF',
+      (error) => error.code === 'DEFECTIVE_AUTOFIX_REF' && /v1\.7\.8/.test(error.message),
     );
   }
   assert.equal(org.state.pulls.length, 0);
+  assert.equal(fs.existsSync(path.join(root, 'tester.json')), false);
 });
 
 test('a non-defective override ref is honoured', async () => {
   const root = tmp('rollout-override-');
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'ci.yml': CI_WORKFLOW } }) },
-  });
+  const org = makeOrg({ repos: { 'trained-assist/demo': repoFixture() } });
   const result = await rolloutAutofix({
-    profileId: 'tester',
-    root,
-    repos: ['trained-assist/demo'],
-    autofix_ref: 'v1.7.9',
-    github: org.github,
+    profileId: 'tester', root, repos: ['trained-assist/demo'], autofix_ref: 'v1.7.9', github: org.github,
   });
   assert.equal(result.ref, 'v1.7.9');
   assert.equal(result.summary.pr_opened, 1);
 });
 
-test('the CI workflow name is detected from the repository, not assumed', async () => {
+test('the watched CI workflow name comes from the repository, not a guess', async () => {
   const root = tmp('rollout-ciname-');
   const org = makeOrg({
     repos: {
       'trained-assist/demo': repoFixture({
-        workflows: { 'ci.yml': 'name: CI + Deploy\non:\n  pull_request:\n' },
+        workflows: [
+          { name: 'Release', path: '.github/workflows/release.yml' },
+          { name: 'CI + Deploy', path: '.github/workflows/ci.yml' },
+        ],
       }),
     },
   });
-  const result = await rolloutAutofix({
-    profileId: 'tester',
-    root,
-    repos: ['trained-assist/demo'],
-    github: org.github,
-  });
+  const result = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
   assert.equal(result.report[0].ciName, 'CI + Deploy');
-  assert.equal(result.report[0].ciMatched, 'fallback');
-  const stored = JSON.parse(fs.readFileSync(path.join(root, 'tester.json'), 'utf8'));
-  assert.equal(stored.registrations[0].ci_workflow_name, 'CI + Deploy');
+  assert.equal(stored(root).registrations[0].ci_workflow_name, 'CI + Deploy');
 });
 
 test('an explicit ci_workflow_name wins over detection', async () => {
   const root = tmp('rollout-ciname-explicit-');
-  const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ workflows: { 'ci.yml': CI_WORKFLOW } }) },
-  });
+  const org = makeOrg({ repos: { 'trained-assist/demo': repoFixture() } });
   const result = await rolloutAutofix({
-    profileId: 'tester',
-    root,
-    repos: ['trained-assist/demo'],
-    ci_workflow_name: 'Nightly CI',
-    github: org.github,
+    profileId: 'tester', root, repos: ['trained-assist/demo'], ci_workflow_name: 'Nightly CI', github: org.github,
   });
   assert.equal(result.report[0].ciName, 'Nightly CI');
 });
 
-test('a repository whose default branch is not main is registered with that branch', async () => {
-  const root = tmp('rollout-master-');
+test('a repository whose only workflow ignores pull requests is skipped, not mis-wired', async () => {
+  const root = tmp('rollout-tagonly-');
   const org = makeOrg({
-    repos: { 'trained-assist/demo': repoFixture({ defaultBranch: 'master', workflows: { 'ci.yml': CI_WORKFLOW } }) },
+    repos: {
+      // "Build & Release" reads as CI to a name heuristic, but it only fires on tags.
+      'trained-assist/demo': repoFixture({
+        workflows: [{ name: 'Build & Release', path: '.github/workflows/release.yml' }],
+        files: { '.github/workflows/release.yml': 'name: Build & Release\non:\n  push:\n    tags: ["v*"]\n' },
+      }),
+    },
+  });
+  const result = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
+  assert.equal(result.summary.skipped, 1);
+  assert.equal(result.report[0].reason, 'no_ci_workflow');
+  assert.equal(org.state.pulls.length, 0);
+});
+
+test('an explicit --ci-workflow that ignores pull requests is refused', async () => {
+  const root = tmp('rollout-explicit-tagonly-');
+  const org = makeOrg({
+    repos: {
+      'trained-assist/demo': repoFixture({
+        workflows: [{ name: 'Build & Release', path: '.github/workflows/release.yml' }],
+        files: { '.github/workflows/release.yml': 'name: Build & Release\non:\n  push:\n    tags: ["v*"]\n' },
+      }),
+    },
   });
   const result = await rolloutAutofix({
-    profileId: 'tester',
-    root,
-    repos: ['trained-assist/demo'],
-    github: org.github,
+    profileId: 'tester', root, repos: ['trained-assist/demo'], ci_workflow_name: 'Build & Release', github: org.github,
   });
+  assert.equal(result.report[0].reason, 'ci_not_pull_request');
+  assert.equal(org.state.pulls.length, 0);
+});
+
+test('the CI ranking prefers the real CI over a cleanup job that also runs on PRs', async () => {
+  const root = tmp('rollout-rank-');
+  const org = makeOrg({
+    repos: {
+      'trained-assist/demo': repoFixture({
+        workflows: [
+          { name: 'CI-Fix Cleanup', path: '.github/workflows/ci-fix-cleanup.yml' },
+          { name: 'CI + Deploy', path: '.github/workflows/ci.yml' },
+        ],
+        files: {
+          '.github/workflows/ci-fix-cleanup.yml': 'name: CI-Fix Cleanup\non:\n  pull_request:\n    types: [closed]\n',
+          '.github/workflows/ci.yml': 'name: CI + Deploy\non:\n  pull_request:\n',
+        },
+      }),
+    },
+  });
+  const result = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
+  assert.equal(result.report[0].ciName, 'CI + Deploy');
+  assert.equal(result.report[0].ciPath, '.github/workflows/ci.yml');
+});
+
+test('a stale nameless listing entry does not win over the real CI', async () => {
+  const root = tmp('rollout-stale-');
+  const org = makeOrg({
+    repos: {
+      'trained-assist/demo': repoFixture({
+        workflows: [
+          // GitHub reports `name` as the path for a workflow with no `name:` field.
+          { name: '.github/workflows/auto-fix-ci.yml', path: '.github/workflows/auto-fix-ci.yml' },
+          { name: 'CI + Deploy', path: '.github/workflows/ci.yml' },
+        ],
+        files: { '.github/workflows/ci.yml': 'name: CI + Deploy\non:\n  pull_request:\n' },
+      }),
+    },
+  });
+  const result = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
+  assert.equal(result.report[0].ciName, 'CI + Deploy');
+});
+
+test('a repository whose default branch is not main is registered with that branch', async () => {
+  const root = tmp('rollout-master-');
+  const org = makeOrg({ repos: { 'trained-assist/demo': repoFixture({ defaultBranch: 'master' }) } });
+  const result = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
   assert.equal(result.report[0].baseBranch, 'master');
-  const stored = JSON.parse(fs.readFileSync(path.join(root, 'tester.json'), 'utf8'));
-  assert.equal(stored.registrations[0].base_branch, 'master');
+  assert.equal(stored(root).registrations[0].base_branch, 'master');
+});
+
+// --- Inventory-driven ---------------------------------------------------------
+
+test('without a repo list the rollout is driven by the org inventory', async () => {
+  const root = tmp('rollout-inventory-');
+  const org = makeOrg({
+    repos: { 'trained-assist/a': repoFixture(), 'trained-assist/b': repoFixture({ defaultBranch: 'master' }) },
+    inventory: { repos: [{ repo: 'trained-assist/b' }, { repo: 'trained-assist/a' }] },
+  });
+  const result = await rolloutAutofix({ profileId: 'tester', root, github: org.github, dryRun: true });
+  assert.deepEqual(result.report.map((row) => row.repo), ['trained-assist/a', 'trained-assist/b']);
+  assert.equal(result.summary.total, 2);
 });

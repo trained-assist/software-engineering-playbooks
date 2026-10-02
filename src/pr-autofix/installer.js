@@ -30,7 +30,6 @@ const {
   REQUIRED_CALLABLES,
   AUTOFIX_OWNER,
   INSTALL_BRANCH,
-  DEFECTIVE_AUTOFIX_REFS,
 } = require('./constants');
 const { fail } = require('./errors');
 const { getAutofixRegistration, recordWorkflowInstalled } = require('./registry');
@@ -102,12 +101,6 @@ function assertAutofixRef(ref) {
   if (!value) fail('INVALID_AUTOFIX_REF', 'autofix_ref is required');
   if (!IMMUTABLE_REF.test(value)) {
     fail('INVALID_AUTOFIX_REF', `autofix_ref must be an immutable tag (e.g. v1.2.1) or a full commit SHA, got "${value}"`);
-  }
-  // R-15: v1.7.4…v1.7.7 is a known-defective window. Refuse it even though it is a
-  // syntactically valid immutable tag — a pin that installs a broken fixer is worse
-  // than no pin, and the org scan in R-15 found no legitimate consumer on it.
-  if (DEFECTIVE_AUTOFIX_REFS.has(value)) {
-    fail('DEFECTIVE_AUTOFIX_REF', `autofix_ref ${value} is in the defective v1.7.4…v1.7.7 window (fixed in v1.7.8, pr-autofix R-15); refusing to install`);
   }
   return value;
 }

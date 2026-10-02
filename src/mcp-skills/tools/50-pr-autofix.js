@@ -99,7 +99,7 @@ const disable = {
 
 const rollout = {
   name: 'engineering_pr_autofix_rollout',
-  description: 'One-command rollout of the pr-autofix workflow across repositories (issue #95). Registers what is missing, installs with the org-known-good ref, detects each repository\'s CI workflow name instead of assuming "CI", and returns a per-repo status table. Pass repos for an explicit list, or omit it to use the org inventory. EXTERNAL WRITE: opens install PRs in every target repository and requires a host GitHub token. dryRun plans every repository and writes nothing.',
+  description: 'One-command rollout of the pr-autofix workflow across repositories (issue #95). Registers what is missing, installs with the org-known-good ref, and returns a per-repo status table where every repository appears with the reason it was skipped. Pass repos for an explicit list, or omit it to use the org inventory. EXTERNAL WRITE: opens install PRs in every target repository and requires a host GitHub token. dryRun plans every repository and writes nothing.',
   inputSchema: {
     type: 'object',
     required: [],
