@@ -101,6 +101,13 @@ on `on: workflow_run` of the target repo's CI workflow (`types: [completed]`) an
 
 - The watched workflow is matched by its **`name:`** (GitHub's `workflow_run.workflows` semantics,
   not the filename), configured per registration as `ci_workflow_name` (default `"CI"`).
+- That filter is a **pattern match, not a string comparison**: GitHub documents it as accepting glob
+  metacharacters (`*`, `**`, `+`, `?`, `[`, `]`, leading `!`) where "a literal match … need[s] each of
+  these special characters escaped with `\`". The installer therefore escapes them, so a CI named
+  `CI + Deploy` gets `workflows: ["CI \\+ Deploy"]` (YAML doubles the backslash). Without the escape
+  the trigger asks for "one or more spaces", matches nothing, and the install still reports a healthy
+  pin — issue #120, where agent/tg-bot had zero `PR Autofix` runs, ever. Escaping also keeps the
+  filter narrow: one workflow, not "every completed workflow in the repo".
 - A job-level `if` guards on: the run concluded `failure`, the run came from a `pull_request`, a PR
   is attached, and the head branch is not already a `fix/ci-*` branch (prevents fix loops).
 - `autofix_ref` must be an **immutable** version tag (`vX.Y.Z`) or a full commit SHA; floating refs
