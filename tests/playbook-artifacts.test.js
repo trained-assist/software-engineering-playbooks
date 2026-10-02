@@ -33,6 +33,8 @@ const {
 
 const ROOT = path.resolve(__dirname, '..');
 const SANDBOX_ROOT = process.env.SANDBOX_ROOT || path.join(ROOT, '.sandbox');
+// .sandbox/ в .gitignore: в свежем checkout'е (CI) его нет — создаём сами.
+fs.mkdirSync(SANDBOX_ROOT, { recursive: true });
 const readJson = rel => JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 const artifactSchema = readJson('contracts/playbook-artifact.schema.json');
 const capabilitySchema = readJson('contracts/playbook-capability.schema.json');

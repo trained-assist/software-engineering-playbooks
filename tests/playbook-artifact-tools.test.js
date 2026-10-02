@@ -17,6 +17,8 @@ const path = require('path');
 // дать ему изолированный dataRoot ДО require, иначе состояние песочницы прошлых
 // прогонов влияет на приёмку.
 const SANDBOX_ROOT = process.env.SANDBOX_ROOT || path.join(__dirname, '..', '.sandbox');
+// .sandbox/ в .gitignore: в свежем checkout'е (CI) его нет — создаём сами.
+fs.mkdirSync(SANDBOX_ROOT, { recursive: true });
 const dataRoot = fs.mkdtempSync(path.join(SANDBOX_ROOT, 'p14-mcp-'));
 process.env.PLAYBOOK_ARTIFACTS_DATA_ROOT = dataRoot;
 
