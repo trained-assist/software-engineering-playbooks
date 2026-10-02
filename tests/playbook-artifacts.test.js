@@ -435,6 +435,8 @@ test('P14: every log line carries correlation ids, an event key and a transition
   assert.equal(confirmed.to, 'settled');
   assert.equal(confirmed.externalRef.startsWith('sel_'), true);
   assert.equal(confirmed.operationId, 'op-log-write');
+  // Время в логе идёт от host clock: песочница не зависит от стенного времени.
+  assert.ok(lines.every(line => line.at === '2026-10-03T10:00:00.000Z'), 'log timestamps come from the injected host clock');
 });
 
 test('P14: credential values never appear in the log, the result or the provider store', () => {

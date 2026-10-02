@@ -39,7 +39,7 @@ function createPlaybookArtifactHost({
 } = {}) {
   const resolvedRoot = artifact.resolveRoot(root);
   const logFile = dataRoot ? `${dataRoot}/playbook-artifacts/events.jsonl` : null;
-  const log = events.createEventLog({ file: logFile, clock });
+  const log = events.createEventLog({ file: logFile, now: clock });
   const selectionProvider = provider.createFakeSelectionProvider({ root: dataRoot || `${resolvedRoot}/.sandbox/provider-default`, clock, fault: providerFault });
 
   const host = capabilities.createCapabilityHost({
