@@ -297,6 +297,85 @@
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_playbook_list",
+      "inputSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      },
+      "allowedTriggers": [
+        "user",
+        "system",
+        "cron"
+      ],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_playbook_get",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "playbook_id"
+        ],
+        "properties": {
+          "playbook_id": {
+            "type": "string"
+          },
+          "playbook_version": {
+            "type": "number"
+          },
+          "detail": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "full"
+            ]
+          },
+          "expected_artifact_hash": {
+            "type": "string"
+          }
+        }
+      },
+      "allowedTriggers": [
+        "user",
+        "system",
+        "cron"
+      ],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_playbook_record_selection",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "playbook_id",
+          "reason"
+        ],
+        "properties": {
+          "playbook_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "playbook_version": {
+            "type": "number"
+          }
+        }
+      },
+      "allowedTriggers": [
+        "user",
+        "system"
+      ],
+      "effect": "write",
+      "requiresApproval": false,
+      "retrySafety": "idempotent"
     }
   ],
   "contextFields": [],

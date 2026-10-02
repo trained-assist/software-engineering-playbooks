@@ -784,6 +784,12 @@ Implemented today:
 - QA logs library (`qa_log_register` / `qa_log_lookup` / `qa_log_list`);
 - pr-autofix registration store + state machine (slice 1:
   `engineering_pr_autofix_register` / `_status` / `_disable`, local state only);
+- domain capabilities for pinned playbook artifacts (P14, epic E5 #21): 
+  `engineering_playbook_list` / `engineering_playbook_get` (read → pinned definition as
+  data/resource, never a plan run) and `engineering_playbook_record_selection` (write →
+  verified effect receipt from a sandboxed provider, idempotent by operationId, advisory
+  without gtdId). One handler, two transport facades (MCP + internal API); see
+  `docs/DOMAIN-TOOLS-AND-PLAYBOOK-ARTIFACTS.md`;
 - Task Packet contract;
 - CLI surface;
 - MCP surface;
@@ -791,8 +797,9 @@ Implemented today:
 - provider manifest;
 - integration/onboarding architecture documents.
 
-See `docs/WORKSPACE-LIFECYCLE.md` for the workspace contract (E1) and `docs/requirements-log.md`
-for the current requirements status.
+See `docs/WORKSPACE-LIFECYCLE.md` for the workspace contract (E1),
+`docs/DOMAIN-TOOLS-AND-PLAYBOOK-ARTIFACTS.md` for the domain capability/playbook-artifact
+contract (P14) and `docs/requirements-log.md` for the current requirements status.
 
 Current priority order:
 
@@ -849,7 +856,14 @@ src/
                         # 62-pr-status: pr_status / issue_status (github_pr_checks stays as a
                         # throwing alias of pr_status);
                         # 63-ci-cd also ci_run_branch (dispatch a branch's test run + status);
-                        # 64-complexity: engineering_estimate_complexity (complexity → price)
+                        # 64-complexity: engineering_estimate_complexity (complexity → price);
+                        # 70-playbook-artifacts: engineering_playbook_list/_get/
+                        #   _record_selection — facade only, definitions stay in playbooks/
+  playbook-artifacts/
+    capabilities.js     # domain capability host (P13 contract): list/get/record_selection
+    artifact.js         # pinned playbooks/<id>.json resolution: path + sha256 + schema check
+    provider.js         # sandboxed fake provider: receipts, happens-once, reconcile by operationId
+    events.js           # I04 event log (correlation ids, event key, transition reason, redaction)
   complexity/
     index.js            # deterministic complexity→price engine (base working day × tier-days × multipliers, 3 prices)
   prompt-domains/       # engineering.md, github.setup.md — read by core's prompt-domains loader
@@ -858,13 +872,15 @@ src/
 templates/githooks/     # pre-commit / pre-push installed by dev_workspace_setup
 templates/ci.yml        # manual test-run workflow for a repo without one (ci-setup drops it in)
 
-contracts/              # incl. playbook.schema.json (vendored Playbook v1)
+contracts/              # incl. playbook.schema.json (vendored Playbook v1),
+                        # playbook-capability.schema.json, playbook-artifact.schema.json
 library/                # step-types.json — typed step library (sub-steps, ladders, flags)
 playbooks-src/          # feature / debugging / new-software / ci-setup / ci-run / skill-tool / epic-delivery sources
 playbooks/              # built Playbook v1 JSON (+ prose procedures prepare-task, connect-github)
 docs/                   # docs/playbooks/*.md — generated readable playbooks
 examples/
-scripts/                # index-repo.js, manifest-check.js, sandbox/ (incl. ci-cloud-run.mjs loop)
+scripts/                # index-repo.js, manifest-check.js, sandbox/ (incl. ci-cloud-run.mjs,
+                        # playbook-artifacts.mjs — P14 domain capability scenario + transcript)
 ```
 
 Expected future top-level capability areas include workspace management, verification, scheduler/admission, repository intelligence and engineering memory.
