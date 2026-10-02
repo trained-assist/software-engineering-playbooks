@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trained-assist/software-engineering-playbooks/contracts/playbook-capability.schema.json",
+  "title": "Playbook domain capability descriptor",
+  "description": "Explicit descriptor of a domain capability: what version it is at, which credential binding scopes it requires and what permissions it carries. Published BEFORE invocation (engineering_playbook_list / createCapabilityHost().listCapabilities()) so that permissions are never discovered by executing the call (AC-116). Vocabulary is P13's: ai-agent-runner src/mcp/capabilities.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capabilityId",
+    "capabilityVersion",
+    "effect",
+    "requiredScopes",
+    "requiredArguments",
+    "description",
+    "permissions",
+    "advisory",
+    "transports",
+    "execution"
+  ],
+  "properties": {
+    "capabilityId": {
+      "type": "string",
+      "description": "Stable domain capability id, e.g. engineering.playbook.get. Same id as in the runner's capability registry (P13)."
+    },
+    "capabilityVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Version of this capability contract. A call with a different explicit version is refused (CAPABILITY_VERSION_UNKNOWN)."
+    },
+    "effect": {
+      "type": "string",
+      "enum": ["read", "write"],
+      "description": "read = no external effect; write = must return a verifiable effect receipt (PR-16)."
+    },
+    "requiredScopes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Credential binding scopes without which the capability cannot execute. The binding VALUE is host-owned and never model-visible."
+    },
+    "requiredArguments": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Mandatory arguments; absence yields missing_input instead of an invented result."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect", "requiresApproval", "retrySafety", "allowedTriggers"],
+      "properties": {
+        "effect": { "type": "string", "enum": ["read", "write"] },
+        "requiresApproval": { "type": "boolean" },
+        "retrySafety": {
+          "type": "string",
+          "enum": ["read_only", "idempotent"],
+          "description": "How a repeat of the same operationId behaves: read_only = nothing to repeat, idempotent = the same effect and the same receipt, never a second effect."
+        },
+        "allowedTriggers": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["user", "cron", "system"] }
+        }
+      }
+    },
+    "advisory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiresGtdId", "mode"],
+      "properties": {
+        "requiresGtdId": {
+          "type": "boolean",
+          "description": "Whether the capability can only run inside a GTD-managed task. False = advisory retrieval is allowed without any gtdId."
+        },
+        "mode": { "type": "string", "enum": ["advisory"] }
+      }
+    },
+    "transports": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Facades over the same handler: mcp:<tool> for the MCP interface, internal-api for the control-plane call. The business logic lives once."
+    },
+    "execution": {
+      "type": "string",
+      "enum": ["catalog_read", "retrieval_only", "external_mutation"],
+      "description": "What the handler is allowed to do. retrieval_only/catalog_read never start a plan."
+    }
+  }
+}

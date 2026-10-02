@@ -61,10 +61,14 @@ function listAllTools() {
   return allTools.map(defOf);
 }
 
-async function callTool(name, args) {
+// `context` — trusted envelope от хоста (profile/userTask/run/gtd/operation/bindings).
+// Не переданные значения остаются undefined: фасад сам решает, что с ними делать
+// (обычно это blocked, а не выдуманный профиль). Старые двухаргументные вызовы
+// (core, cron) продолжают работать как раньше.
+async function callTool(name, args, context = {}) {
   const tool = tools.find(t => t.name === name);
   if (!tool) throw new Error(`Unknown tool: ${name}`);
-  return tool.handler(args || {}, { userId: process.env.USER_ID });
+  return tool.handler(args || {}, { userId: process.env.USER_ID, ...context });
 }
 
 module.exports = { listTools, listAllTools, callTool };

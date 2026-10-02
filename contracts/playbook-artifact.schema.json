@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trained-assist/software-engineering-playbooks/contracts/playbook-artifact.schema.json",
+  "title": "Pinned playbook artifact retrieval result",
+  "description": "Result envelope of engineering.playbook.list / engineering.playbook.get (and the provenance block of engineering.playbook.record_selection). The playbook definition is DATA here: the artifact is pinned by path + sha256, and the envelope states that no plan was started. Fields are named after the P13 capability outcome contract, not after a second MCP-only vocabulary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "capabilityId",
+    "capabilityVersion",
+    "permissions",
+    "bindings",
+    "execution",
+    "advisory",
+    "correlation",
+    "provenance"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "capabilityId": { "type": "string", "minLength": 1 },
+    "capabilityVersion": { "type": "integer", "minimum": 1 },
+    "permissions": {
+      "type": "object",
+      "required": ["effect", "requiresApproval", "retrySafety", "allowedTriggers"],
+      "properties": {
+        "effect": { "type": "string", "enum": ["read", "write"] },
+        "requiresApproval": { "type": "boolean" },
+        "retrySafety": { "type": "string", "enum": ["read_only", "idempotent"] },
+        "allowedTriggers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiredScopes", "providedBinding", "valueDelivery"],
+      "properties": {
+        "requiredScopes": { "type": "array", "items": { "type": "string" } },
+        "providedBinding": {
+          "description": "Ref and scope only. The binding value never crosses into the result or the log.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ref", "scope"],
+              "properties": { "ref": { "type": "string" }, "scope": { "type": "string" } }
+            },
+            { "type": "null" }
+          ]
+        },
+        "valueDelivery": { "type": "string", "minLength": 1 }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "planStarted", "planId", "reason", "detail"],
+      "description": "Explicit statement of what execution the call did. Reading a playbook is not running it.",
+      "properties": {
+        "kind": { "type": "string", "enum": ["catalog_read", "retrieval_only", "external_mutation"] },
+        "planStarted": { "const": false, "description": "Hard invariant: this surface never starts a plan. Any future capability that may start one gets its own contract, not a flag flip here." },
+        "planId": { "type": "null" },
+        "reason": { "type": "string", "minLength": 1 },
+        "detail": { "type": ["string", "null"] }
+      }
+    },
+    "advisory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiresGtdId", "createsGtdId", "gtdId", "mode"],
+      "properties": {
+        "requiresGtdId": { "type": "boolean" },
+        "createsGtdId": { "const": false },
+        "gtdId": { "type": ["string", "null"], "description": "Null unless the caller already had a GTD id; retrieval and selection never create one." },
+        "mode": { "type": "string", "enum": ["advisory"] }
+      }
+    },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "userTaskId", "runId", "operationId"],
+      "properties": {
+        "profileId": { "type": ["string", "null"] },
+        "userTaskId": { "type": ["string", "null"] },
+        "runId": { "type": ["string", "null"] },
+        "operationId": { "type": ["string", "null"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "definitionSource", "interface", "artifactRoot", "templatesVsInterface"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1 },
+        "definitionSource": { "type": "string", "minLength": 1 },
+        "interface": { "type": "string", "minLength": 1 },
+        "artifactRoot": { "type": "string", "minLength": 1 },
+        "templatesVsInterface": { "type": "string", "minLength": 1 }
+      }
+    },
+    "playbook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "title", "scope", "artifactRef", "artifactHash", "sourceRevision", "docRef", "stageCount", "stepCount", "stepTypes", "stages", "inputs", "defaults"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "scope": { "type": "string" },
+        "when_to_use": { "type": ["string", "null"] },
+        "artifactRef": { "type": "string", "pattern": "^playbooks/[a-z0-9-]+\\.json$" },
+        "artifactHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "sourceRevision": { "type": ["string", "null"] },
+        "docRef": { "type": ["string", "null"] },
+        "stageCount": { "type": "integer", "minimum": 1 },
+        "stepCount": { "type": "integer", "minimum": 1 },
+        "stepTypes": { "type": "array", "items": { "type": "string" } },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "title", "stepCount"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "title": { "type": "string" },
+              "stepCount": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "required", "derive"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "required": { "type": "boolean" },
+              "derive": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "defaults": { "type": "object" }
+      }
+    },
+    "definition": {
+      "description": "Present only with detail=full. The pinned definition returned as data, not as an instruction to start executing.",
+      "type": "object"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Catalog of pinned descriptors (engineering.playbook.list)."
+    },
+    "counts": { "type": "object" },
+    "selection": { "type": "object" },
+    "receipt": { "type": "object" },
+    "external": { "type": "object" }
+  }
+}
