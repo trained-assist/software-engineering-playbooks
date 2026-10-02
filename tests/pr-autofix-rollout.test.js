@@ -444,6 +444,33 @@ test('a stale nameless listing entry does not win over the real CI', async () =>
   assert.equal(result.report[0].ciName, 'CI + Deploy');
 });
 
+test('a second rollout after an install is a no-op — the cleanup workflow never wins as CI', async () => {
+  const root = tmp('rollout-converge-');
+  const org = makeOrg({
+    repos: { 'trained-assist/demo': repoFixture({ workflows: [{ name: 'CI + Deploy', path: '.github/workflows/ci.yml' }] }) },
+  });
+  const first = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
+  assert.equal(first.summary.pr_opened, 1);
+  const pr = org.state.pulls[0];
+  org.state.pulls[0].state = 'closed';
+  // Merge it: the install branch becomes the base branch.
+  org.repos['trained-assist/demo'].refs.main = org.repos['trained-assist/demo'].refs['pr-autofix/install'];
+  org.repos['trained-assist/demo'].files = { ...org.repos['trained-assist/demo'].snapshots[org.repos['trained-assist/demo'].refs.main] };
+  // The repo now also lists the two service workflows.
+  org.repos['trained-assist/demo'].workflows = [
+    { name: 'PR Autofix', path: '.github/workflows/pr-autofix.yml' },
+    { name: 'CI Fix Cleanup', path: '.github/workflows/ci-fix-cleanup.yml' },
+    { name: 'CI + Deploy', path: '.github/workflows/ci.yml' },
+  ];
+  assert.equal(pr.number, 1);
+
+  const second = await rolloutAutofix({ profileId: 'tester', root, repos: ['trained-assist/demo'], github: org.github });
+  assert.equal(second.summary.installed, 1, 'the second run must be a no-op, not a re-install');
+  assert.equal(second.report[0].reason, 'already_pinned');
+  assert.equal(second.report[0].ciName, 'CI + Deploy');
+  assert.equal(org.state.pulls.length, 1, 'no second PR is opened');
+});
+
 test('a repository whose default branch is not main is registered with that branch', async () => {
   const root = tmp('rollout-master-');
   const org = makeOrg({ repos: { 'trained-assist/demo': repoFixture({ defaultBranch: 'master' }) } });

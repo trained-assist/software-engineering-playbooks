@@ -28,6 +28,8 @@ const { fail } = require('./errors');
 const {
   ROLLOUT_DEFAULT_AUTOFIX_REF,
   DEFECTIVE_AUTOFIX_REFS,
+  WORKFLOW_PATH,
+  CLEANUP_WORKFLOW_PATH,
   INVENTORY_REPO,
   INVENTORY_PATH,
 } = require('./constants');
@@ -143,12 +145,24 @@ async function listWorkflows(github, repo) {
   return list.filter((row) => row && typeof row.path === 'string' && row.path);
 }
 
+// The two workflow files this service installs. They must never be treated as a CI to
+// watch: `ci-fix-cleanup.yml` is named "CI Fix Cleanup", outranks the real CI by name,
+// and runs on `pull_request: closed`, so picking it would make the installed trigger
+// fire when a pull request closes. Without this exclusion a second rollout run would
+// try to re-install against the cleanup workflow and never converge.
+const SERVICE_WORKFLOW_PATHS = new Set([WORKFLOW_PATH, CLEANUP_WORKFLOW_PATH]);
+
 // GitHub reports a workflow's `name` as its path when the file has no `name:` field,
 // and the listing also keeps entries for workflows that no longer exist on disk. Both
 // are invisible to a name-based heuristic and both silently win it.
 function hasRealName(entry) {
   if (!entry || !entry.name) return false;
-  return entry.name !== entry.path;
+  if (entry.name !== entry.path) return true;
+  return !SERVICE_WORKFLOW_PATHS.has(entry.path);
+}
+
+function isServiceWorkflow(entry) {
+  return Boolean(entry && entry.path && SERVICE_WORKFLOW_PATHS.has(entry.path));
 }
 
 // Rank a workflow name as a CI candidate. The signal that matters is whether "ci" is
@@ -159,7 +173,7 @@ function hasRealName(entry) {
 // of the name qualifies CI itself, which is never the check we want.
 function ciRank(entry) {
   const name = String(entry && entry.name ? entry.name : '');
-  if (!hasRealName(entry)) return -1;
+  if (isServiceWorkflow(entry) || !hasRealName(entry)) return -1;
   const lower = name.toLowerCase();
   if (lower === 'ci') return 3;
   if (/^ci[^a-z]/.test(lower) && name.slice(2, 3) !== '-') return 2;
