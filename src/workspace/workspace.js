@@ -27,6 +27,20 @@ function workspaceIdOf(ownerKey, idempotencyKey) {
   return `ws-${store.shortHash(`${ownerKey}\u0000${idempotencyKey}`, 16)}`;
 }
 
+// Operation records share one flat store per workspaceRoot, so their key must
+// identify the operation the way the caller does: (principal, repository) plus
+// the idempotency key it handed in. Keying them by the bare idempotencyKey made
+// one plan unable to touch two repositories — for-task.js passes rootTaskId as
+// the idempotency key, so the second repository compared its fingerprint (which
+// contains repositoryId) against the first repository's record and refused with
+// CONFLICT "idempotency key was already used with incompatible arguments".
+// rootTaskId stays out of this key on purpose: reusing one idempotency key for
+// two different tasks in the same repository is a caller bug and must keep
+// conflicting.
+function operationKeyOf({ principal, repositoryId }, idempotencyKey) {
+  return `${principal}\u0000${repositoryId}\u0000${idempotencyKey}`;
+}
+
 function normalizeBinding(binding) {
   if (!binding || typeof binding !== 'object') fail('INVALID_BINDING', 'binding object is required');
   const required = ['workspaceRoot', 'principal', 'hostId', 'repositoryId', 'sourceCheckout', 'baseRevision', 'rootTaskId', 'idempotencyKey'];
@@ -146,7 +160,7 @@ function buildRecord({ b, resolvedBase, workspaceId, layout, ownerKey, fingerpri
     codePath: layout.codePath,
     runtimePath: layout.runtimePath,
     sourceCheckout: b.sourceCheckout,
-    operationKey: b.idempotencyKey,
+    operationKey: operationKeyOf(b, b.idempotencyKey),
     operationFingerprint: fingerprint,
     ownerKey,
     leaseGeneration,
@@ -225,9 +239,24 @@ function saveWorkspace(workspaceRoot, record) {
   store.writeJsonAtomic(store.workspaceFile(workspaceRoot, record.workspaceId), record);
 }
 
+// A lease that reached RELEASED/FAILED is over: its worktree is gone and its
+// branch is merged or deliberately retained. Its operation record and workspace
+// record stay on disk as history — but they must not act as a live reservation,
+// because the caller is entitled to reuse the same (principal, repository,
+// rootTaskId) label for the next lease. The fingerprint deliberately contains
+// the resolved base revision, so a new spawn after release always computes a
+// different one; comparing it against a finished lease is what used to burn the
+// label for good with CONFLICT "incompatible idempotency arguments".
+function isFinishedLease(workspaceRoot, op) {
+  if (!op || !op.workspaceId) return false;
+  const record = loadWorkspace(workspaceRoot, op.workspaceId);
+  return Boolean(record && [RELEASED, FAILED].includes(record.status));
+}
+
 function completeProvision({ b, resolvedBase, fingerprint, workspaceId, layout, ownerKey, hooks = {}, reused = false, leaseGeneration = 1 }) {
   store.ensureStore(b.workspaceRoot);
   const intent = readIntent(b.workspaceRoot, workspaceId) || {};
+  const operationKey = operationKeyOf(b, b.idempotencyKey);
   let state = intent.state || 'reserved';
 
   let worktree = git.worktreeForPath(b.sourceCheckout, layout.codePath);
@@ -279,12 +308,30 @@ function completeProvision({ b, resolvedBase, fingerprint, workspaceId, layout, 
 
   const existing = loadWorkspace(b.workspaceRoot, workspaceId);
   const record = existing || buildRecord({ b, resolvedBase, workspaceId, layout, ownerKey, fingerprint, leaseGeneration });
+  const previousLeaseFinished = Boolean(existing) && [RELEASED, FAILED].includes(existing.status);
   record.status = PROVISIONING;
   record.readiness = { requested: CODE_READY, actual: PROVISIONING };
   record.git = { headRevision: head, worktreeRegistered: Boolean(worktree) };
   record.failure = null;
   record.retention = null;
-  if (existing) record.leaseGeneration = existing.leaseGeneration || 1;
+  record.releasedAt = previousLeaseFinished ? null : record.releasedAt;
+  // Same reason: the record must describe the lease that is actually running
+  // now, otherwise status() keeps reporting the base revision and fingerprint of
+  // a lease that no longer exists.
+  if (previousLeaseFinished) {
+    record.branch = layout.branch;
+    record.baseRevision = resolvedBase;
+    record.operationFingerprint = fingerprint;
+  }
+  // A record left by a finished lease must not pin the new lease to the old
+  // generation number — leaseGeneration is what tells a resumed lease from a
+  // fresh one, so keep the caller's value across a re-lease and only preserve it
+  // when the same lease is being completed again (crash recovery, resume).
+  if (existing) {
+    record.leaseGeneration = previousLeaseFinished
+      ? leaseGeneration
+      : (existing.leaseGeneration || leaseGeneration);
+  }
   saveWorkspace(b.workspaceRoot, record);
 
   writeIntent(b.workspaceRoot, workspaceId, { state: 'metadata_written', worktreePath: layout.codePath });
@@ -296,8 +343,8 @@ function completeProvision({ b, resolvedBase, fingerprint, workspaceId, layout, 
   saveWorkspace(b.workspaceRoot, record);
 
   writeIntent(b.workspaceRoot, workspaceId, { state: CODE_READY, attempts: (intent.attempts || 0) + 1, lastError: null });
-  writeOperation(b.workspaceRoot, b.idempotencyKey, {
-    operationKey: b.idempotencyKey,
+  writeOperation(b.workspaceRoot, operationKey, {
+    operationKey,
     fingerprint,
     workspaceId,
     ownerKey,
@@ -306,7 +353,7 @@ function completeProvision({ b, resolvedBase, fingerprint, workspaceId, layout, 
   writeOwner(b.workspaceRoot, ownerKey, {
     ownerKey,
     workspaceId,
-    operationKey: b.idempotencyKey,
+    operationKey,
     principal: b.principal,
     hostId: b.hostId,
     repositoryId: b.repositoryId,
@@ -327,6 +374,7 @@ function spawnWorkspace(binding, options = {}) {
   const fingerprint = fingerprintOf(b, resolvedBase);
   const ownerKey = ownerKeyOf(b);
   const workspaceId = workspaceIdOf(ownerKey, b.idempotencyKey);
+  const operationKey = operationKeyOf(b, b.idempotencyKey);
   const layout = layoutFor(b, workspaceId);
 
   assertContained(b.workspaceRoot, layout.workspaceDir, 'workspace directory');
@@ -335,11 +383,15 @@ function spawnWorkspace(binding, options = {}) {
 
   store.ensureStore(b.workspaceRoot);
 
-  const existingOp = readOperation(b.workspaceRoot, b.idempotencyKey);
+  // A finished lease (released/failed) leaves its operation record behind as
+  // history. Read it, but treat it as absent: the next spawn for this label is a
+  // new lease and must be allowed to resolve a fresh base revision.
+  const finished = isFinishedLease(b.workspaceRoot, readOperation(b.workspaceRoot, operationKey));
+  const existingOp = finished ? null : readOperation(b.workspaceRoot, operationKey);
   if (existingOp) {
     if (existingOp.fingerprint !== fingerprint) {
       fail('CONFLICT', 'idempotency key was already used with incompatible arguments', {
-        operationKey: b.idempotencyKey,
+        operationKey,
         existingWorkspaceId: existingOp.workspaceId,
         workspaceId,
       });
@@ -350,19 +402,23 @@ function spawnWorkspace(binding, options = {}) {
     }
   }
 
-  const releaseOp = store.acquireLock(store.lockFile(b.workspaceRoot, `op:${b.idempotencyKey}`));
+  const releaseOp = store.acquireLock(store.lockFile(b.workspaceRoot, `op:${operationKey}`));
   const releaseOwner = store.acquireLock(store.lockFile(b.workspaceRoot, `owner:${ownerKey}`));
   try {
-    const op = readOperation(b.workspaceRoot, b.idempotencyKey);
+    const op = isFinishedLease(b.workspaceRoot, readOperation(b.workspaceRoot, operationKey))
+      ? null
+      : readOperation(b.workspaceRoot, operationKey);
     if (op) {
       if (op.fingerprint !== fingerprint) {
         fail('CONFLICT', 'idempotency key was already used with incompatible arguments', {
-          operationKey: b.idempotencyKey,
+          operationKey,
           existingWorkspaceId: op.workspaceId,
           workspaceId,
         });
       }
       const existingOwner = readOwner(b.workspaceRoot, ownerKey);
+      const intent = readIntent(b.workspaceRoot, op.workspaceId || workspaceId);
+      if (intent?.branch) layout.branch = intent.branch;
       return completeProvision({
         b,
         resolvedBase,
@@ -384,9 +440,17 @@ function spawnWorkspace(binding, options = {}) {
       });
     }
     const nextLease = (owner && owner.leaseGeneration ? owner.leaseGeneration : 0) + 1;
+    // A label identifies a task; each publication needs its own immutable branch.
+    // Preserve the prior lease before replacing the stable task lookup record.
+    const previous = loadWorkspace(b.workspaceRoot, workspaceId);
+    if (previous) {
+      store.writeJsonAtomic(path.join(store.storeRoot(b.workspaceRoot), 'history', workspaceId,
+        `lease-${previous.leaseGeneration || 1}.json`), previous);
+    }
+    if (nextLease > 1) layout.branch += `-lease-${nextLease}`;
 
-    writeOperation(b.workspaceRoot, b.idempotencyKey, {
-      operationKey: b.idempotencyKey,
+    writeOperation(b.workspaceRoot, operationKey, {
+      operationKey,
       fingerprint,
       workspaceId,
       ownerKey,
@@ -395,7 +459,8 @@ function spawnWorkspace(binding, options = {}) {
     });
     writeIntent(b.workspaceRoot, workspaceId, {
       intentId: workspaceId,
-      operationKey: b.idempotencyKey,
+      operationKey,
+      idempotencyKey: b.idempotencyKey,
       ownerKey,
       workspaceId,
       state: 'reserved',
@@ -418,7 +483,7 @@ function spawnWorkspace(binding, options = {}) {
     writeOwner(b.workspaceRoot, ownerKey, {
       ownerKey,
       workspaceId,
-      operationKey: b.idempotencyKey,
+      operationKey,
       principal: b.principal,
       hostId: b.hostId,
       repositoryId: b.repositoryId,
@@ -644,7 +709,10 @@ function recoverIntent(root, intent) {
     repositoryId: binding.repositoryId,
     baseRevision: binding.baseRevision,
     rootTaskId: binding.rootTaskId,
-    idempotencyKey: intent.operationKey,
+    // Intents written before the operation key was scoped carry the bare
+    // idempotency key in operationKey; fall back to it so recovery of an
+    // in-flight spawn still rebuilds the same workspace id.
+    idempotencyKey: intent.idempotencyKey || intent.operationKey,
     workspaceProfile: binding.workspaceProfile || 'cli',
     allowFetch: false,
     leaseTtlMs: null,
@@ -734,6 +802,7 @@ module.exports = {
   WorkspaceError,
   workspaceIdOf,
   ownerKeyOf,
+  operationKeyOf,
   STATUSES,
   CODE_READY,
   NEEDS_REVIEW,

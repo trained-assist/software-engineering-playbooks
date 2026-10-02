@@ -280,7 +280,19 @@ function recordWorkflowInstalled({
   return record;
 }
 
+// Restore only this procedure's registration; preserve other repositories in the registry.
+function restoreAutofixRegistration({ profileId, root, repo, before }) {
+  const file = registrationFile({ profileId, root });
+  const data = readRegistry(file, profileId);
+  data.registrations = data.registrations.filter((entry) => entry.repo !== repo);
+  if (before) data.registrations.push(before);
+  data.registrations.sort(byRepo);
+  writeRegistry(file, data);
+  return getAutofixRegistration({ profileId, root, repo });
+}
+
 module.exports = {
+  restoreAutofixRegistration,
   SCHEMA_VERSION,
   STATUSES,
   RECORD_FIELDS,

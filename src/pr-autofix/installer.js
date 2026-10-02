@@ -27,11 +27,14 @@ const {
   DEFAULT_CI_WORKFLOW_NAME,
   WORKFLOW_PATH,
   CLEANUP_WORKFLOW_PATH,
+  REQUIRED_CALLABLES,
+  AUTOFIX_OWNER,
   INSTALL_BRANCH,
 } = require('./constants');
 const { fail } = require('./errors');
 const { getAutofixRegistration, recordWorkflowInstalled } = require('./registry');
 
+const DEFAULT_BASE_BRANCH = 'main';
 const GITHUB_API_BASE = 'https://api.github.com';
 const USER_AGENT = 'trained-assist-engineering';
 
@@ -169,6 +172,68 @@ function cleanupWorkflow({ repo, autofix_ref }) {
     '      gh_token: ${{ secrets.AUTOFIX_PAT || github.token }}',
     '',
   ].join('\n');
+}
+
+// A ref is only usable if every reusable workflow we are about to reference resolves AT
+// that ref. `uses: owner/repo/.github/workflows/x.yml@ref` is resolved by GitHub at run
+// time, not at install time, so an unresolvable pin used to surface as a red install PR
+// (or worse, a merge that only broke later). Refuse before anything is written.
+async function assertRefCallable(github, ref, { required = REQUIRED_CALLABLES } = {}) {
+  for (const rel of required) {
+    const res = await github.ghFetch(
+      'GET',
+      `/repos/${AUTOFIX_OWNER}/contents/${rel}?ref=${encodeURIComponent(ref)}`,
+    );
+    const text = res.ok && typeof res.data?.content === 'string'
+      ? Buffer.from(res.data.content.replace(/\n/g, ''), 'base64').toString('utf8') : '';
+    // Accept the block/inline forms emitted by our pinned workflows, fail closed otherwise.
+    const onBlock = text.match(/^(?:on|'on'|"on"):\s*\n((?:[ \t]+[^\n]*\n|\n)*)/m);
+    if (res.ok && ((onBlock && /^  workflow_call\s*:/m.test(onBlock[1]))
+      || /^(?:on|'on'|"on"):\s*(?:workflow_call|\[[^\]\n]*\bworkflow_call\b[^\]\n]*\]|\{\s*workflow_call:.*\})\s*$/m.test(text))) continue;
+    fail(
+      'REF_NOT_CALLABLE',
+      `autofix_ref "${ref}" does not contain ${AUTOFIX_OWNER}/${rel} (HTTP ${res.status}); `
+      + 'pick a release where every required reusable workflow exists — installing against '
+      + 'an older ref produces a workflow GitHub cannot resolve',
+      { ref, missing: rel, status: res.status },
+    );
+  }
+  return ref;
+}
+
+// `main` is only the usual default branch: part of the org still lives on `master`, and a
+// silent wrong base branch is an install PR against nothing. Likewise the watched CI
+// workflow is matched by its `name:`, so it has to be read, not guessed.
+async function autodetectRepoDefaults(github, repo) {
+  const meta = await github.ghFetch('GET', `/repos/${repo}`);
+  if (!meta.ok) githubError(`read repository ${repo}`, meta);
+  const defaultBranch = (meta.data && meta.data.default_branch) || 'main';
+
+  const workflows = await github.ghFetch('GET', `/repos/${repo}/actions/workflows`);
+  if (!workflows.ok) githubError(`list workflows of ${repo}`, workflows);
+  const list = Array.isArray(workflows.data && workflows.data.workflows)
+    ? workflows.data.workflows
+    : [];
+
+  // Preference order, most specific first: an exact "CI" name, then anything that reads as
+  // CI, then the most frequently run workflow, then the constant. A repo with no workflows
+  // at all is a fact, not a guess — we say so and fall back to the constant.
+  const byName = (n) => list.find((w) => (w.name || '').toLowerCase() === n);
+  const exact = byName('ci');
+  const ciish = list.filter((w) => /(^|[^a-z])ci([^a-z]|$)|test|check|build|lint|verify|node\.js/i.test(`${w.name || ''} ${w.path || ''}`));
+  const fallback = ciish.sort((a, b) => (b.badge_url ? 0 : 0) - (a.badge_url ? 0 : 0) || 0)[0];
+  const chosen = exact || ciish[0];
+  const ciWorkflowName = (chosen && chosen.name) || DEFAULT_CI_WORKFLOW_NAME;
+
+  return {
+    default_branch: defaultBranch,
+    ci_workflow_name: ciWorkflowName,
+    detected: {
+      default_branch: Boolean((meta.data && meta.data.default_branch)),
+      ci_workflow_name: Boolean(chosen),
+      workflow_count: list.length,
+    },
+  };
 }
 
 // Build the map of workflow-path -> content for a registration. Pure and
@@ -310,8 +375,45 @@ async function installAutofixWorkflow({
   const effectiveRef = assertAutofixRef(
     autofix_ref || registration.autofix_ref || DEFAULT_AUTOFIX_REF,
   );
-  const effectiveBase = base_branch || registration.base_branch || 'main';
-  const effectiveCi = ci_workflow_name || registration.ci_workflow_name || DEFAULT_CI_WORKFLOW_NAME;
+  // Start from the EXPLICIT arguments only. The registration's value is applied below, after
+  // autodetection, because a stored default is not a decision.
+  let effectiveBase = base_branch || '';
+  let effectiveCi = ci_workflow_name || '';
+  const cap = github || resolveGithubCapability();
+
+  // Both before the ref is baked into any file: a wrong pin or a wrong base branch is
+  // cheap to reject here and expensive to discover in a review round trip.
+  await assertRefCallable(cap, effectiveRef);
+
+  // Autodetect reads two objective facts about the repository: its default branch, and the
+  // `name:` of the CI workflow `workflow_run.workflows` will match on. An explicit argument
+  // always wins — a human asked for that value. Otherwise the detected fact wins over the
+  // stored default, because "main"/"CI" in a fresh registration are DEFAULTS, not decisions,
+  // and part of the org still lives on `master`. When the two disagree the receipt says so,
+  // so a wrong configuration is visible rather than silently rewritten.
+  const detected = await autodetectRepoDefaults(cap, registration.repo);
+  const registeredBase = registration.base_branch || '';
+  const registeredCi = registration.ci_workflow_name || '';
+  const explicitBase = Boolean(base_branch);
+  const explicitCi = Boolean(ci_workflow_name);
+  const before = { base_branch: registeredBase, ci_workflow_name: registeredCi };
+  if (!effectiveBase) {
+    effectiveBase = (registeredBase && registeredBase !== DEFAULT_BASE_BRANCH)
+      ? registeredBase
+      : detected.default_branch;
+  }
+  if (!effectiveCi) {
+    effectiveCi = (registeredCi && registeredCi !== DEFAULT_CI_WORKFLOW_NAME)
+      ? registeredCi
+      : detected.ci_workflow_name;
+  }
+  const notes = (before.base_branch && before.base_branch !== effectiveBase)
+    ? [`base_branch: registered "${before.base_branch}" -> detected "${effectiveBase}"${explicitBase ? '' : ' (no explicit argument)'}`.replace(': registered', ': registration said')]
+    : [];
+  if (before.ci_workflow_name && before.ci_workflow_name !== effectiveCi && !explicitCi) {
+    notes.push(`ci_workflow_name: registration said "${before.ci_workflow_name}", detected "${effectiveCi}"`);
+  }
+
   const desired = buildWorkflowFiles({
     repo: registration.repo,
     autofix_ref: effectiveRef,
@@ -319,7 +421,6 @@ async function installAutofixWorkflow({
     features: registration.features,
   });
   const filePaths = Object.keys(desired);
-  const cap = github || resolveGithubCapability();
 
   const persist = (prUrl) => recordWorkflowInstalled({
     profileId,
@@ -332,7 +433,16 @@ async function installAutofixWorkflow({
     baseBranch: effectiveBase,
   });
 
-  const common = { repo: registration.repo, pinned_ref: effectiveRef, path: WORKFLOW_PATH, files: filePaths };
+  const common = {
+    repo: registration.repo,
+    pinned_ref: effectiveRef,
+    path: WORKFLOW_PATH,
+    files: filePaths,
+    base_branch: effectiveBase,
+    ci_workflow_name: effectiveCi,
+    detected,
+    notes,
+  };
 
   // Already merged/installed on the base branch with identical pinned content.
   if (await filesMatch(cap, registration.repo, desired, effectiveBase)) {
@@ -394,6 +504,9 @@ module.exports = {
   setGithubCapabilityFactory,
   resolveGithubCapability,
   assertAutofixRef,
+  assertRefCallable,
+  autodetectRepoDefaults,
   buildWorkflowFiles,
+  filesMatch,
   installAutofixWorkflow,
 };

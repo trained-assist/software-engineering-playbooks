@@ -20,3 +20,36 @@ jobs:
         run: npm test
       - name: Provider manifest contract
         run: npm run manifest:check
+      - name: Build freshness
+        run: npm run check:playbooks
+
+  schema-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone agent and diff schema
+        run: |
+          git clone --depth 1 https://github.com/trained-assist/trained-assist-agent.git /tmp/agent
+          diff contracts/playbook.schema.json /tmp/agent/contracts/playbook.schema.json || {
+            echo "::error::Schema drift detected! Update contracts/playbook.schema.json from trained-assist-agent"
+            echo "Agent version: $(cd /tmp/agent && git rev-parse --short HEAD)"
+            exit 1
+          }
+
+  staging-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: trained-assist/pr-autofix
+          ref: v1.7.5
+          path: .sandbox/pinned-tool
+          persist-credentials: false
+      - name: Setup, repeat, evidence and teardown against a bare endpoint
+        env:
+          PR_AUTOFIX_PINNED_DIR: ${{ github.workspace }}/.sandbox/pinned-tool
+        run: node --test tests/pr-autofix-bare.test.js tests/pr-autofix-setup.test.js

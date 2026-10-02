@@ -5,4 +5,6 @@ module.exports = {
   ...require('./constants'),
   ...require('./registry'),
   ...require('./installer'),
+  ...require('./setup'),
+  ...require('./rollout'),
 };

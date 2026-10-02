@@ -24,9 +24,22 @@ const path = require('path');
 const git = require('./git');
 const { fail } = require('./errors');
 const { spawnWorkspace, statusWorkspace, releaseWorkspace, ownerKeyOf, workspaceIdOf, CODE_READY } = require('./workspace');
+const { buildMap, mapStatus } = require('../repo-map');
 
 const DEFAULT_WORKSPACE_ROOT = path.join(os.homedir(), 'agent-data', 'engineering-workspaces');
 const DEFAULT_MIRRORS_ROOT = path.join(os.homedir(), 'agent-data', 'engineering-mirrors');
+
+// Background map build for the commit this workspace was just created at.
+// Fire-and-forget on purpose: spawn must never wait for it (scenario step 1)
+// and never fail because of it — a map is an optimisation, raw reading always
+// works. REPO_MAP_SPAWN_BUILD=0 is the kill-switch: no redeploy, no rollback.
+function spawnMapBuild({ codePath, workspaceRoot }) {
+  if (process.env.REPO_MAP_SPAWN_BUILD === '0') return;
+  buildMap({ repoPath: codePath, workspacesRoot: workspaceRoot }).then(
+    (result) => console.error(`[repo-map] ${result.status} ${String(result.sha).slice(0, 8)} for ${path.basename(codePath)}`),
+    (error) => console.error(`[repo-map] spawn build skipped: ${(error && error.message) || error}`),
+  );
+}
 
 // One local mirror per repository, shared across principals/tasks — never a
 // task's own working directory, only the thing git worktree forks from. Clone
@@ -78,7 +91,26 @@ function spawnWorkspaceForTask({
   if (fs.existsSync(workspaceRoot)) {
     const workspaceId = taskWorkspaceId({ principal, repositoryUrl, repositoryId, rootTaskId });
     const existing = statusWorkspace({ workspaceRoot, workspaceId, principal, rootTaskId });
-    if (existing.found && existing.status === CODE_READY) return { ...existing, reused: true, recovered: false };
+    if (existing.found && existing.status === CODE_READY) {
+      const actualBranch = git.git(['branch', '--show-current'], existing.codePath).stdout;
+      if (actualBranch !== existing.branch) {
+        fail('LABEL_BRANCH_MISMATCH', 'workspace branch differs from lease metadata; retained for review',
+          { branch: existing.branch, actualBranch, workspaceId });
+      }
+      // Old lifecycle versions reissued the original branch for generation 2+.
+      if (existing.leaseGeneration > 1 && !existing.branch.endsWith(`-lease-${existing.leaseGeneration}`)) {
+        fail('LABEL_BRANCH_MERGED', 'legacy lease reused a publication branch; release it before respawning',
+          { branch: existing.branch, leaseGeneration: existing.leaseGeneration, workspaceId });
+      }
+      const mirror = ensureMirror(repositoryUrl, mirrorsRoot);
+      const base = resolveBaseRevision(mirror);
+      const published = git.resolveCommit(mirror, `refs/remotes/origin/${existing.branch}`);
+      if (published && base && git.isMergedInto(mirror, published, base)) {
+        fail('LABEL_BRANCH_MERGED', 'published branch is already merged; release it before respawning',
+          { branch: existing.branch, publishedRevision: published, workspaceId });
+      }
+      return { ...existing, reused: true, recovered: false };
+    }
   }
 
   const sourceCheckout = ensureMirror(repositoryUrl, mirrorsRoot);
@@ -95,6 +127,10 @@ function spawnWorkspaceForTask({
     rootTaskId,
     idempotencyKey: rootTaskId,
     allowFetch: true,
+  }, {
+    hooks: {
+      afterSpawn: ({ codePath }) => spawnMapBuild({ codePath, workspaceRoot }),
+    },
   });
 }
 
@@ -106,7 +142,13 @@ function taskWorkspaceId({ principal, repositoryUrl, repositoryId, rootTaskId })
 
 function statusWorkspaceForTask({ principal, repositoryUrl, repositoryId, rootTaskId, workspaceRoot = DEFAULT_WORKSPACE_ROOT } = {}) {
   const workspaceId = taskWorkspaceId({ principal, repositoryUrl, repositoryId, rootTaskId });
-  return statusWorkspace({ workspaceRoot, workspaceId, principal, rootTaskId });
+  const status = statusWorkspace({ workspaceRoot, workspaceId, principal, rootTaskId });
+  // Report whether the map for this workspace's commit exists yet (scenario
+  // step 1). Read-only: status never triggers a build.
+  if (status && status.codePath && status.status === CODE_READY) {
+    status.repoMap = mapStatus({ repoPath: status.codePath, workspacesRoot: workspaceRoot });
+  }
+  return status;
 }
 
 function releaseWorkspaceForTask({

@@ -79,8 +79,19 @@ Design: `docs/spec-generation-migration.md` (proposal, slices S1–S5, запу�
 ## Non-goals (следующие шаги, помечено в docs)
 
 - Этап 2: «спецификация глубже в инженерную тему» + ideation глубже — отдельным изменением.
-- Сейлз-форма «любой документ → более сейлзовый вид» — отдельная операция, не в генератор.
+- Сейлз-форма «любой документ → более сейлзовый вид» — отдельная операция, не в генераторе.
 - Вынос спецификационной части из `trained-assist-freelance-skill` — отдельный PR после мержа этого.
+
+## Checklist — ci-setup / ci-run playbooks (issue #51, plan-3e40a139)
+
+Два переиспользуемых системных плейбука «прогон тестов в облаке»: разовый `ci-setup` (workflow_dispatch на целевой репо) и частый `ci-run` (dispatch → durable-ожидание → статус). Дизайн: `docs/ci-cloud-run.md`; сценарий: `docs/user-scenarios/ci/cloud-test-run.md`.
+
+## Definition of done
+
+- [x] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/54
+- [x] Merged to main (9c0552f; + фикс #65 aea7f83)
+- [x] Deployed to prod — verified live (оба плейбука в `playbook_list`, живой прогон зелёный+красный,
+      прогон не деплоит; первый репозиторий `trained-assist-agent` настроен, PR #1864)
 
 ## Checklist — skill-tool: новый MCP-инструмент в скиле (issue #53, plan-aa96d610)
 
@@ -118,3 +129,57 @@ staging-джобы в целевом репо — блок и задача, а �
 
 - Пробный прогон на реальном маленьком инструменте и первая живая сессия — после мержа + деплоя ядра.
 - staging-гейт для целевых репозиториев без staging-job — задача в issue #9 (в самом плейбуке), не здесь.
+
+## Checklist — pr_status / issue_status (issue #52, plan-a738d291)
+
+## Goal
+
+Один инструмент «что с PR / что с issue» в engineering-skills: `pr_status` (открыт/смержен, чеки
+`ci` + `staging-gate`, сжатый хвост логов упавших джобов через `compressLog` из pr-autofix, доехал
+ли мерж-коммит до прода, autofix-PR) и `issue_status` (все связанные PR, включая cross-repo).
+`github_pr_checks` поглощён бросающим алиасом; `cicd_track_pr` оставлен (ставит PR на отслеживание,
+а не читает статус).
+
+## Definition of done
+
+- [ ] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/61
+- [ ] Merged to main
+- [ ] Deployed to prod — verified live
+
+## Slices
+
+- [x] S1 `src/github/client.js` — общий `getToken`/`ghFetch`/`ghGraphql`, вынесен из `60-github.js`.
+- [x] S2 `src/github/compress-log.js` — вендоренный `compressLog` из pr-autofix`@0e36f2e` + parity-тест.
+- [x] S3+S4 `src/github/pr-status-core.js` — `prStatus` (чеки/вердикт/логи/autofix/прод/бюджет) + `issueStatus`.
+- [x] S5 `scripts/sandbox/pr-status.mjs` + `tests/fixtures/github/pr-status.js` — замкнутый цикл.
+- [x] S6 `src/mcp-skills/tools/62-pr-status.js` + алиас `github_pr_checks`, реестр, `package.json`, README.
+- [x] До PR: `check`/`manifest:check` exit 0; юниты 23/23; песочница `test:sandbox:pr` PASS (до: FAIL по правильной причине).
+
+## Checklist — repo maps L0/L1 (эпик #49, plan-61ac1e86)
+
+Сжатые карты репозитория: L1 «скелет» (детерминированный парсер, без LLM) + L0 «карта» (≤ 2k токенов,
+однострочные описания дешёвой моделью, кеш по commit sha). Тул `repo_map(repo, level, focus)`,
+сборка при `engineering_spawn_workspace` + ленивая достройка нового sha, правило «сначала repo_map».
+Сценарий: одна карта < 1 с из кеша вместо десятков открытых файлов (~480 поисков за 10 дней).
+
+## Goal
+
+Первый шаг разведки — карта репозитория: `< 1 с` из кеша, ≤ 2k токенов на L0, без блужданий по файлам.
+
+## Definition of done
+
+- [x] CI green on https://github.com/trained-assist/software-engineering-playbooks/pull/62 (supersedes #59: ветка перебазирована на main, #59 конфликтовал — его CI не запускался)
+- [ ] Merged to main
+- [ ] Deployed to prod — verified live
+
+## Slices
+
+- [x] 1. Общий кеш карт по commit sha вне worktree.
+- [x] 2. Парсер JS через вендоренный acorn (закрыты пробелы CJS/метод-скана).
+- [x] 3. Рендер L1 «скелет» (детерминированный).
+- [x] 4. Рендер L0 «карта» ≤ 2k токенов.
+- [x] 5. LLM-описания L0 + деградация без ключа.
+- [x] 6. MCP-тул `repo_map` + provider manifest.
+- [x] 7. Фоновый сбор при спавне + ленивая достройка (+ kill-switch `REPO_MAP_SPAWN_BUILD`).
+- [x] 8. Правило «сначала repo_map» в плейбуках feature/debugging.
+- [x] 9. Тесты срезов + песочница `npm run sandbox:repo-map` (S5).

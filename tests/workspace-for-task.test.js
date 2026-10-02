@@ -104,6 +104,70 @@ test('resume still reuses the workspace after the default branch moved on the re
   assert.equal(second.baseRevision, first.baseRevision);
 });
 
+// Release ends the LEASE, not the label. A task label stays reusable: the next
+// spawn for it must get a fresh worktree on the CURRENT base revision, as a new
+// lease generation. Regression: spawn() compared the operation fingerprint
+// (which contains the resolved base revision) against the record left behind by
+// the released lease, so every repeat spawn after release failed CONFLICT
+// "idempotency key was already used with incompatible arguments" — the label was
+// burnt for good and the whole plan could never touch its repository again.
+test('a released task label can be spawned again: new lease, current base revision', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'plan-card-z01', workspaceRoot, mirrorsRoot };
+
+  const first = spawnWorkspaceForTask(opts);
+
+  const work = tmp('eng-remote-after-release-');
+  runGit(work, ['clone', '-q', repositoryUrl, '.']);
+  runGit(work, ['config', 'user.email', 'test@example.com']);
+  runGit(work, ['config', 'user.name', 'Test']);
+
+  const advance = (file, message) => {
+    fs.writeFileSync(path.join(work, file), `${message}\n`);
+    runGit(work, ['add', '.']);
+    runGit(work, ['commit', '-qm', message]);
+    runGit(work, ['push', '-q', 'origin', 'HEAD:main']);
+  };
+
+  advance('ONE.md', 'first advance');
+  const released = releaseWorkspaceForTask({ ...opts, deliveryEvidence: { merged: true, evidence: 'merge commit' } });
+  assert.equal(released.status, 'released');
+  advance('TWO.md', 'second advance');
+
+  const second = spawnWorkspaceForTask(opts);
+
+  assert.equal(second.status, 'code_ready');
+  assert.equal(second.workspaceId, first.workspaceId);
+  assert.equal(second.codePath, first.codePath);
+  assert.notEqual(second.branch, first.branch);
+  assert.equal(second.branch, first.branch + '-lease-2');
+  const historical = JSON.parse(fs.readFileSync(path.join(workspaceRoot, '.engineering-workspaces', 'history', first.workspaceId, 'lease-1.json')));
+  assert.equal(historical.branch, first.branch);
+  assert.equal(historical.status, 'released');
+  assert.equal(runGit(second.codePath, ['branch', '--show-current']).trim(), second.branch);
+  // A new lease, based on the base revision as it is NOW — not the stale one
+  // the released lease was created from.
+  assert.equal(second.leaseGeneration, first.leaseGeneration + 1);
+  assert.notEqual(second.baseRevision, first.baseRevision);
+  assert.equal(runGit(second.codePath, ['rev-parse', 'HEAD']).trim(), second.baseRevision);
+});
+
+// The guard that must survive the fix above: while a lease is LIVE, one
+// operation key reused for a different task in the same repository is a caller
+// bug and must still be refused. Only a finished lease is reusable.
+test('a live lease still refuses a second task under the same operation key', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'live-lease', workspaceRoot, mirrorsRoot };
+
+  spawnWorkspaceForTask(opts);
+  spawnWorkspaceForTask({ ...opts, repositoryUrl, rootTaskId: 'live-lease-2' });
+
+  assert.equal(statusWorkspaceForTask({ ...opts, rootTaskId: 'live-lease' }).status, 'code_ready');
+  assert.equal(statusWorkspaceForTask({ ...opts, rootTaskId: 'live-lease-2' }).status, 'code_ready');
+});
+
 test('a branch already occupying the target name is an explicit collision, not a silent takeover', () => {
   const repositoryUrl = makeRemote();
   const { workspaceRoot, mirrorsRoot } = env();
@@ -151,4 +215,111 @@ test('missing principal/repositoryUrl/rootTaskId fails explicitly', () => {
   assert.throws(() => spawnWorkspaceForTask({ repositoryUrl: 'x', rootTaskId: 'y' }), WorkspaceError);
   assert.throws(() => spawnWorkspaceForTask({ principal: 'vova', rootTaskId: 'y' }), WorkspaceError);
   assert.throws(() => spawnWorkspaceForTask({ principal: 'vova', repositoryUrl: 'x' }), WorkspaceError);
+});
+
+// Operation records used to be stored under the bare idempotency key, which
+// for-task.js sets to rootTaskId. One plan that touches two repositories — the
+// normal case, e.g. a card with an anchor repo and a consumer repo — therefore
+// had the second repository compare its fingerprint against the first
+// repository's operation record and fail with "idempotency key was already
+// used with incompatible arguments". That is what stopped plan c4c5b145
+// (card Z01 of the architecture epic) on 2026-10-01: the pr-autofix workspace
+// held the plan's key, so playbooks and trained-agent-architecture could not be
+// spawned at all. One task label must be usable in every repository of the
+// plan, and still reuse its own workspace on a resume.
+test('one rootTaskId holds a workspace in several repositories of the same plan', () => {
+  const anchorRepo = makeRemote();
+  const consumerRepo = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', rootTaskId: 'plan-c4c5b145', workspaceRoot, mirrorsRoot };
+
+  const anchor = spawnWorkspaceForTask({ ...opts, repositoryUrl: anchorRepo });
+  const consumer = spawnWorkspaceForTask({ ...opts, repositoryUrl: consumerRepo });
+
+  assert.equal(anchor.status, 'code_ready');
+  assert.equal(consumer.status, 'code_ready');
+  assert.notEqual(anchor.workspaceId, consumer.workspaceId);
+  assert.notEqual(anchor.codePath, consumer.codePath);
+  assert.ok(fs.existsSync(path.join(consumer.codePath, 'README.md')));
+
+  // Each repository keeps its own resumable workspace.
+  assert.equal(spawnWorkspaceForTask({ ...opts, repositoryUrl: anchorRepo }).workspaceId, anchor.workspaceId);
+  assert.equal(spawnWorkspaceForTask({ ...opts, repositoryUrl: consumerRepo }).workspaceId, consumer.workspaceId);
+});
+
+test('one rootTaskId is not shared between principals', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+
+  const mine = spawnWorkspaceForTask({ principal: 'vova', repositoryUrl, rootTaskId: 'plan-c4c5b145', workspaceRoot, mirrorsRoot });
+  const other = spawnWorkspaceForTask({ principal: 'petr', repositoryUrl, rootTaskId: 'plan-c4c5b145', workspaceRoot, mirrorsRoot });
+
+  assert.equal(mine.status, 'code_ready');
+  assert.equal(other.status, 'code_ready');
+  assert.notEqual(mine.workspaceId, other.workspaceId);
+  assert.notEqual(mine.branch, other.branch);
+});
+
+// The protection the scoping above must not weaken: one idempotency key reused
+// for a different task in the same repository is still a caller bug.
+test('reusing one operation key for a different task in the same repository still conflicts', () => {
+  const { spawnWorkspace } = require('../src/workspace/workspace');
+  const source = makeSourceRepo();
+  const root = tmp('eng-ws-');
+  const binding = {
+    workspaceRoot: root,
+    sourceCheckout: source.dir,
+    principal: 'vova',
+    hostId: 'test-host',
+    repositoryId: 'acme/app',
+    baseRevision: runGit(source.dir, ['rev-parse', 'HEAD']).trim(),
+    rootTaskId: 'task-a',
+    idempotencyKey: 'op-1',
+    allowFetch: false,
+  };
+
+  spawnWorkspace(binding);
+  assert.throws(
+    () => spawnWorkspace({ ...binding, rootTaskId: 'task-b' }),
+    (error) => error instanceof WorkspaceError && error.code === 'CONFLICT',
+  );
+});
+
+function makeSourceRepo() {
+  const dir = tmp('eng-source-');
+  runGit(dir, ['init', '-q', '-b', 'main']);
+  fs.writeFileSync(path.join(dir, 'README.md'), '# source\n');
+  runGit(dir, ['add', '.']);
+  runGit(dir, ['config', 'user.email', 'test@example.com']);
+  runGit(dir, ['config', 'user.name', 'Test']);
+  runGit(dir, ['commit', '-qm', 'initial']);
+  return { dir };
+}
+
+
+test('published merged lease cannot resume and respawn preserves remote branch', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'published', workspaceRoot, mirrorsRoot };
+  const first = spawnWorkspaceForTask(opts);
+  runGit(first.codePath, ['push', 'origin', `HEAD:refs/heads/${first.branch}`]);
+  assert.throws(() => spawnWorkspaceForTask(opts), e => e.code === 'LABEL_BRANCH_MERGED');
+  assert.equal(releaseWorkspaceForTask(opts).status, 'released');
+  const second = spawnWorkspaceForTask(opts);
+  assert.notEqual(second.branch, first.branch);
+  assert.equal(runGit(second.codePath, ['rev-parse', `origin/${first.branch}`]).trim(), first.baseRevision);
+  assert.equal(second.baseRevision, first.baseRevision);
+  assert.equal(spawnWorkspaceForTask(opts).branch, second.branch);
+  assert.equal(statusWorkspaceForTask(opts).branch, second.branch);
+  assert.equal(releaseWorkspaceForTask(opts).status, 'released');
+});
+
+test('branch metadata mismatch refuses resume without changing work', () => {
+  const repositoryUrl = makeRemote();
+  const { workspaceRoot, mirrorsRoot } = env();
+  const opts = { principal: 'vova', repositoryUrl, rootTaskId: 'mismatch', workspaceRoot, mirrorsRoot };
+  const first = spawnWorkspaceForTask(opts);
+  runGit(first.codePath, ['checkout', '-b', 'foreign-work']);
+  assert.throws(() => spawnWorkspaceForTask(opts), e => e.code === 'LABEL_BRANCH_MISMATCH');
+  assert.equal(runGit(first.codePath, ['branch', '--show-current']).trim(), 'foreign-work');
 });
