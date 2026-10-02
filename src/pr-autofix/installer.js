@@ -109,6 +109,26 @@ function quoteYaml(value) {
   return JSON.stringify(String(value));
 }
 
+// `on.<event>.workflows` is a PATTERN filter, not a string comparison. GitHub documents it
+// next to branches/tags/paths: these filters "accept glob patterns that use characters like
+// `*`, `**`, `+`, `?`, `!` and others... If a name contains any of these characters and you
+// want a literal match, you need to escape each of these special characters with `\`", where
+// `+` means "one or more of the preceding character" (Filter pattern cheat sheet).
+//
+// So the raw name is not the pattern: `CI + Deploy` asks for two-or-more spaces and matches
+// nothing, and the installed `pr-autofix.yml` then never fires while install/rollout report
+// a healthy pin (issue #120 — trained-assist-agent and tg-bot had 0 runs, ever). Escaping
+// keeps the filter narrow (one workflow, not "every completed workflow in the repo") while
+// making it match the name that actually exists.
+const FILTER_PATTERN_SPECIAL = /[\\*?+[\]]/g;
+
+// `!` negates only as the first character of a pattern, so that is the only place escaping it
+// is needed — escaping it mid-pattern would be noise GitHub's matcher has no use for.
+function escapeWorkflowFilterPattern(name) {
+  const text = String(name);
+  return text.replace(FILTER_PATTERN_SPECIAL, (c) => `\\${c}`).replace(/^!/, '\\!');
+}
+
 function mainWorkflow({ repo, autofix_ref, ci_workflow_name }) {
   return [
     '# Managed by the trained-assist-engineering pr-autofix service.',
@@ -117,11 +137,14 @@ function mainWorkflow({ repo, autofix_ref, ci_workflow_name }) {
     '# Trigger: the repository CI workflow named below completes. The pinned',
     '# callable only acts on a pull-request CI run that failed, and never on an',
     "# already-fix branch (fix/ci-*), so it cannot loop on its own fixes.",
+    '#',
+    '# The name below is a pattern filter, so glob metacharacters in it (+, *, ?, [, ])',
+    '# are escaped for a literal match. `quoteYaml` doubles those backslashes for YAML.',
     'name: PR Autofix',
     '',
     'on:',
     '  workflow_run:',
-    `    workflows: [${quoteYaml(ci_workflow_name)}]`,
+    `    workflows: [${quoteYaml(escapeWorkflowFilterPattern(ci_workflow_name))}]`,
     '    types: [completed]',
     '',
     'permissions:',

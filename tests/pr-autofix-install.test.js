@@ -354,6 +354,110 @@ test('the pinned CI workflow name is configurable via ci_workflow_name', async (
   assert.equal(result.registration.ci_workflow_name, 'Build & Test');
 });
 
+// --- Issue #120: the `workflows:` filter is a PATTERN, not a string comparison -----
+
+// GitHub documents `on.<event>.workflows` as accepting glob patterns: "The `workflows`
+// filters accept glob patterns that use characters like `*`, `**`, `+`, `?`, `!` and
+// others... If a name contains any of these characters and you want a literal match,
+// you need to escape each of these special characters with `\`" (docs: Workflow syntax →
+// `on.workflow_run.workflows`, Filter pattern cheat sheet: `+` = "one or more of the
+// preceding character"). An unescaped `+` in a workflow named `CI + Deploy` therefore asks
+// for two or more spaces and never matches — the trigger silently never fires while the
+// install reports healthy (trained-assist/trained-assist-agent, tg-bot: 0 runs ever).
+//
+// The matcher below mirrors that documented syntax (no dependencies in this repo) so the
+// test asserts behaviour — "the emitted pattern matches the real workflow name" — not the
+// presence of a backslash.
+const FILTER_PATTERN = /\\(.)|(\*\*)|([*?])|(\+)|(\[[^\]]*\])|(.)/g;
+
+function patternToRegExp(pattern) {
+  const source = String(pattern).replace(/^!/, '').replace(FILTER_PATTERN, (m, esc, globstar, star, plus, set, lit) => {
+    if (esc !== undefined) return esc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (globstar !== undefined) return '.*';
+    if (star !== undefined) return star === '*' ? '[^/]*' : '.?';
+    if (plus !== undefined) return '+';
+    if (set !== undefined) return set;
+    return lit.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  });
+  return new RegExp(`^${source}$`);
+}
+
+// The `workflows:` value as GitHub will read it: a double-quoted YAML scalar, so the same
+// escapes JSON applies (`\\` for a backslash, `\"` for a quote) are valid YAML escapes.
+function emittedWorkflowPatterns(yaml) {
+  const line = String(yaml).split('\n').find((l) => /^\s+workflows:\s*\[/.test(l));
+  assert.ok(line, `no workflows: filter in generated workflow:\n${yaml}`);
+  return [...line.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => JSON.parse(`"${m[1]}"`));
+}
+
+test('the workflows filter matches a CI name containing "+" (issue #120)', async () => {
+  const name = 'CI + Deploy';
+  const yaml = buildWorkflowFiles({
+    repo: 'trained-assist/demo',
+    autofix_ref: 'v1.2.1',
+    ci_workflow_name: name,
+    features: { cleanup: false },
+  })[WORKFLOW_PATH];
+
+  const patterns = emittedWorkflowPatterns(yaml);
+  assert.equal(patterns.length, 1);
+  assert.equal(patternToRegExp(patterns[0]).test(name), true,
+    `emitted pattern ${JSON.stringify(patterns[0])} must match the workflow name ${JSON.stringify(name)}`);
+  // The other CI-ish workflows of a real repo must not be swept in by an over-broad pattern.
+  assert.equal(patternToRegExp(patterns[0]).test('CI  Deploy'), false);
+  assert.equal(patternToRegExp(patterns[0]).test('CI + Deploy nightly'), false);
+});
+
+test('the workflows filter literal-matches every glob metacharacter in a CI name', async () => {
+  const names = [
+    'CI',                    // no specials — unchanged output
+    'Build & Test',          // not special in filter patterns
+    'CI + Deploy',
+    'Build C++',
+    'Release (stable)',
+    'lint*all',
+    'matrix [a-z] tests',
+    'nightly?',
+    '!weird name',
+    'windows path\\build',
+  ];
+  const yaml = buildWorkflowFiles({
+    repo: 'trained-assist/demo',
+    autofix_ref: 'v1.2.1',
+    ci_workflow_name: names[0],
+    features: { cleanup: false },
+  })[WORKFLOW_PATH];
+  assert.match(yaml, /workflows: \["CI"\]/, 'a plain name must keep the plain form');
+
+  for (const name of names) {
+    const content = buildWorkflowFiles({
+      repo: 'trained-assist/demo',
+      autofix_ref: 'v1.2.1',
+      ci_workflow_name: name,
+      features: { cleanup: false },
+    })[WORKFLOW_PATH];
+    const patterns = emittedWorkflowPatterns(content);
+    assert.equal(patterns.length, 1, `exactly one watched workflow for ${JSON.stringify(name)}`);
+    assert.equal(patternToRegExp(patterns[0]).test(name), true,
+      `emitted pattern ${JSON.stringify(patterns[0])} must literal-match ${JSON.stringify(name)}`);
+  }
+});
+
+test('a glob-metacharacter CI name survives a full install into the opened PR', async () => {
+  const root = tmp('pr-autofix-');
+  register('alice', root, { ci_workflow_name: 'CI + Deploy' });
+  const fake = makeFakeGithub({ workflowNames: ['CI + Deploy', 'Issue triage'] });
+
+  await installAutofixWorkflow({ profileId: 'alice', root, repo: 'trained-assist/demo', github: fake.github });
+
+  const content = fake.fileOn(INSTALL_BRANCH, WORKFLOW_PATH);
+  const patterns = emittedWorkflowPatterns(content);
+  assert.equal(patternToRegExp(patterns[0]).test('CI + Deploy'), true);
+  assert.equal(patternToRegExp(patterns[0]).test('Issue triage'), false);
+  // The registration keeps the real name — the escaping is a wire-format concern only.
+  assert.equal(statusAutofix({ profileId: 'alice', root, repo: 'trained-assist/demo' }).registrations[0].ci_workflow_name, 'CI + Deploy');
+});
+
 test('install requires an immutable autofix ref and a prior registration', async () => {
   const root = tmp('pr-autofix-');
   register('alice', root, { autofix_ref: 'v1' });

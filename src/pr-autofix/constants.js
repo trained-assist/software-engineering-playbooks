@@ -17,6 +17,9 @@ const IMMUTABLE_REF = /^(?:v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?|[0-9a-f]{40})$
 
 // `workflow_run.workflows` matches the target repo CI workflow's `name:` (not
 // its filename), which is why the install tool exposes `ci_workflow_name`.
+// It is a *pattern* filter, so the installer escapes glob metacharacters in the
+// name before emitting it — see escapeWorkflowFilterPattern in installer.js and
+// issue #120 (`CI + Deploy` matched nothing, so the trigger never fired).
 const DEFAULT_CI_WORKFLOW_NAME = 'CI';
 
 const WORKFLOW_PATH = '.github/workflows/pr-autofix.yml';
