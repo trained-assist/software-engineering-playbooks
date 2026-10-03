@@ -210,7 +210,9 @@ function createHttpApiClient({ baseUrl, token = '', timeoutMs = 5000 } = {}) {
       }
       return { status: response.status, body: parsed };
     } catch (e) {
-      if (e && e.name === 'AbortError') {
+      // undici при прерывании может бросить и AbortError, и TypeError с cause —
+      // надёжный признак нашего собственного дедлайна это сам signal.
+      if (controller.signal.aborted || (e && (e.name === 'AbortError' || (e.cause && e.cause.name === 'AbortError')))) {
         return { status: 0, body: { kind: 'transport_timeout', reason: `no response within ${timeoutMs}ms` }, timedOut: true };
       }
       return { status: 0, body: { kind: 'transport_failed', reason: e.message } };

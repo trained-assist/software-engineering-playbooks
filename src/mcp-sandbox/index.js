@@ -118,6 +118,7 @@ module.exports = {
   ...providerFixture,
   ...capabilities,
   createSandboxDomainHost,
+  callbackInbox,
   createBindingStoreResolver,
   writeBindingValue,
   bindingStoreFile,

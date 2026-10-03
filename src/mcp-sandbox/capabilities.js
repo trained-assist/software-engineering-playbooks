@@ -175,7 +175,10 @@ function createCapabilityHost({ provider, log, bindingResolver } = {}) {
 
   async function invoke({ capabilityId, capabilityVersion, arguments: rawArgs = {}, caller = {}, binding, operationId, resolveBinding } = {}) {
     const capability = getCapability(capabilityId, capabilityVersion);
+    const replyContext = caller.replyContext || null;
 
+    // replyChannel в корреляции — чтобы контекст ответа читался в КАЖДОЙ строке лога,
+    // а не только в приёме/ответе (AC-117: контекст ответа не теряется по дороге).
     const correlation = {
       profileId: caller.profileId ?? null,
       userTaskId: caller.userTaskId ?? null,
@@ -185,6 +188,7 @@ function createCapabilityHost({ provider, log, bindingResolver } = {}) {
       capabilityVersion: capability.capabilityVersion,
       bindingRef: binding ? binding.ref : null,
       bindingScope: binding ? binding.scope : null,
+      replyChannel: replyContext ? replyContext.channel : null,
     };
 
     const { clean: args, dropped } = splitReservedArguments(rawArgs);
@@ -192,9 +196,7 @@ function createCapabilityHost({ provider, log, bindingResolver } = {}) {
       log?.write('envelope.spoof_ignored', { ...correlation, from: null, to: 'received', reasonCode: 'RESERVED_ARGUMENT_DROPPED', droppedFields: dropped });
     }
 
-    const replyContext = caller.replyContext || null;
-    const channel = replyContext ? replyContext.channel : null;
-    log?.write('capability.received', { ...correlation, effect: capability.effect, requiredScopes: capability.requiredScopes, replyChannel: channel, from: null, to: 'received', reasonCode: 'REQUEST_ACCEPTED' });
+    log?.write('capability.received', { ...correlation, effect: capability.effect, requiredScopes: capability.requiredScopes, from: null, to: 'received', reasonCode: 'REQUEST_ACCEPTED' });
 
     const missing = capability.requiredArguments.filter(name => args[name] === undefined || args[name] === null || args[name] === '');
     if (missing.length > 0) {
@@ -244,7 +246,6 @@ function createCapabilityHost({ provider, log, bindingResolver } = {}) {
       log?.write(answer.status === 'late' ? 'provider.read.late' : 'provider.read.confirmed', {
         ...correlation,
         providerEventId: answer.eventId || null,
-        replyChannel: replyContext ? replyContext.channel : null,
         from: 'validated',
         to: 'settled',
         reasonCode: answer.status === 'late' ? 'READ_RESPONSE_AFTER_DEADLINE' : 'READ_CONFIRMED',
@@ -297,7 +298,6 @@ function createCapabilityHost({ provider, log, bindingResolver } = {}) {
         providerEventId: applied.eventId || null,
         receiptId: applied.receipt.receiptId,
         callbackIds,
-        replyChannel: replyContext ? replyContext.channel : null,
         from: 'validated',
         to: 'settled',
         reasonCode: replayed ? 'REPLAY_SAME_RECEIPT_NO_SECOND_EFFECT' : late ? 'RECEIPT_LATE_AFTER_DEADLINE' : 'RECEIPT_CONFIRMED',
