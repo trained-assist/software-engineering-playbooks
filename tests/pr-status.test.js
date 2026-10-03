@@ -77,6 +77,15 @@ test.after(() => {
 
 const R = fixture.REPOS;
 
+// #112: the health endpoint describes ONE deployed service. A verdict is only
+// issued for the repository that endpoint actually serves, so each prod test
+// below declares which repo its fixture health endpoint stands in for. The
+// refusal case (a foreign repo gets no verdict at all) has its own test.
+function healthServes(repo) {
+  process.env.ENGINEERING_DELIVERY_REPO = repo;
+  return () => { delete process.env.ENGINEERING_DELIVERY_REPO; };
+}
+
 test('S3: open PR with failed CI → red verdict, compressed log tail, expired log handled', async () => {
   const r = await prStatus(R.X, 42);
   assert.equal(r.ok, true);
@@ -119,28 +128,50 @@ test('S3: aggregate — pending / none / all-skipped are not green', () => {
 });
 
 test('S3/S4: merged PR → live prod verdict from health-compare only', async () => {
-  const r = await prStatus(R.X, 77);
+  const restore = healthServes(R.X);
+  try {
+    const r = await prStatus(R.X, 77);
   assert.equal(r.ok, true);
   assert.equal(r.pr.merged, true);
   assert.equal(r.pr.merge_commit_sha, 'sha-merged');
   assert.equal(r.ci.verdict, 'green');
   assert.ok(r.prod, 'prod block present for a merged PR');
-  assert.equal(r.prod.verdict, 'live');
-  assert.equal(r.prod.source, 'health-compare', 'live only from health-compare');
+    assert.equal(r.prod.verdict, 'live');
+    assert.equal(r.prod.source, 'health-compare', 'live only from health-compare');
+  } finally { restore(); }
+});
+
+test('S4: a repo the health endpoint does not serve gets NO prod verdict (#112)', async () => {
+  const restore = healthServes(R.X);
+  try {
+    const r = await prStatus(R.Y, 78);
+    assert.equal(r.ok, true);
+    assert.equal(r.prod.verdict, 'unknown');
+    assert.equal(r.prod.evidence, 'prod-endpoint-other-repo');
+    assert.equal(r.prod.delivery_repo, R.X);
+  } finally { restore(); }
 });
 
 test('S4: lagging production → not_yet (never live)', async () => {
-  const r = await prStatus(R.Y, 78);
-  assert.equal(r.ok, true);
-  assert.equal(r.prod.verdict, 'not_yet');
+  const restore = healthServes(R.Y);
+  try {
+    const r = await prStatus(R.Y, 78);
+    assert.equal(r.ok, true);
+    assert.equal(r.prod.verdict, 'not_yet');
+  } finally { restore(); }
 });
 
 test('S4: repo without a health endpoint → unknown + deploy-green evidence', async () => {
-  const r = await prStatus(R.SKILL, 5);
-  assert.equal(r.ok, true);
-  assert.equal(r.prod.verdict, 'unknown');
-  assert.match(String(r.prod.evidence), /deploy/i, 'deploy job is evidence, not a verdict');
-  assert.notEqual(r.prod.source, 'health-compare');
+  // This repo IS declared as served, but its merge commit is not the one prod
+  // runs — a green deploy job must stay evidence, never the verdict.
+  const restore = healthServes(R.SKILL);
+  try {
+    const r = await prStatus(R.SKILL, 5);
+    assert.equal(r.ok, true);
+    assert.equal(r.prod.verdict, 'unknown');
+    assert.match(String(r.prod.evidence), /deploy/i, 'deploy job is evidence, not a verdict');
+    assert.notEqual(r.prod.source, 'health-compare');
+  } finally { restore(); }
 });
 
 test('S4: open PR has no prod block; autofix PR is found by branch prefix', async () => {

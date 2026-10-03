@@ -510,6 +510,37 @@
       "effect": "write",
       "requiresApproval": false,
       "retrySafety": "idempotent"
+    },
+    {
+      "name": "engineering_change_status",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "change_ref"
+        ],
+        "properties": {
+          "change_ref": {
+            "type": "string"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "workspace_ref": {
+            "type": "string"
+          },
+          "requirements_ref": {
+            "type": "string"
+          }
+        }
+      },
+      "allowedTriggers": [
+        "user",
+        "cron",
+        "system"
+      ],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
     }
   ],
   "contextFields": [],
