@@ -25,6 +25,7 @@ const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 const SUPERSEDE_MAX = 5;
 const BRANCH_SEARCH_MAX = 3;
+const DETAIL_MAX = 5;
 const SEARCH_TYPES = [['pr', 'pull'], ['issue', 'issue']];
 
 // Priority among exact candidates: a ref the caller states right now outranks
@@ -123,11 +124,23 @@ function priorityOf(candidate) {
   return EXACT_ORDER.length;
 }
 
+const sourceRank = (source) => {
+  const idx = EXACT_ORDER.indexOf(source);
+  return idx === -1 ? EXACT_ORDER.length : idx;
+};
+
+// Strongest evidence first: a caller reading evidence[0] must see the reason
+// the candidate is EXACT, not the weak text-similarity hit it was merged with.
+function sortEvidence(candidate) {
+  candidate.evidence.sort((a, b) => sourceRank(a.source) - sourceRank(b.source));
+  return candidate;
+}
+
 function mergeCandidate(list, next) {
   const key = dedupeKey(next);
   const found = list.find((c) => dedupeKey(c) === key);
   if (!found) {
-    list.push(next);
+    list.push(sortEvidence(next));
     return next;
   }
   for (const ev of next.evidence) {
@@ -136,6 +149,7 @@ function mergeCandidate(list, next) {
   if (next.score !== null && (found.score === null || next.score > found.score)) found.score = next.score;
   if (next.relation_type === 'exact') found.relation_type = 'exact';
   if (next.timestamp && !found.timestamp) found.timestamp = next.timestamp;
+  sortEvidence(found);
   return found;
 }
 
@@ -400,6 +414,46 @@ async function collectBranchPulls({ repo, branches, ghFetch, sources }) {
   return { candidates, authError };
 }
 
+// A search/branch hit carries no `head` and no `merged_at`: a squash-merged PR
+// then looks exactly like "closed without merge". Every EXACT PR is hydrated
+// with the full PR payload (bounded), so `merged_at` is a fact, not a guess.
+async function hydrateExactPulls({ repo, candidates, ghFetch, sources }) {
+  const targets = candidates
+    .filter((c) => c.relation_type === 'exact' && c.kind === 'pull' && !c.ref.head_ref)
+    .slice(0, DETAIL_MAX);
+  if (!targets.length) return { authError: null };
+  let authError = null;
+  let hydrated = 0;
+  const errors = [];
+  for (const c of targets) {
+    try {
+      const pr = await ghFetch(`/repos/${repo}/pulls/${c.ref.number}`);
+      hydrated += 1;
+      c.ref = {
+        ...c.ref,
+        title: pr.title || c.ref.title,
+        state: pr.state || c.ref.state,
+        merged_at: pr.merged_at || null,
+        merge_commit_sha: pr.merge_commit_sha || null,
+        head_ref: pr.head && pr.head.ref ? pr.head.ref : c.ref.head_ref,
+        head_sha: pr.head && pr.head.sha ? pr.head.sha : null,
+        labels: (pr.labels || []).map((l) => (typeof l === 'string' ? l : l.name)).filter(Boolean),
+        updated_at: pr.updated_at || c.ref.updated_at,
+      };
+      sortEvidence(c);
+      c.evidence.push({ source: 'github_pr_detail', why: `full payload of PR #${c.ref.number}: head branch and merged_at` });
+    } catch (e) {
+      const code = errorCode(e);
+      if (code === 'GITHUB_AUTH' || code === 'RATE_LIMITED') authError = authError || sectionError(e);
+      else errors.push({ pr: c.identity, error: sectionError(e) });
+    }
+  }
+  if (authError) sources.push({ name: 'github_pr_detail', ok: false, error: authError, attempted: targets.length });
+  else if (errors.length) sources.push({ name: 'github_pr_detail', ok: false, error: errors[0].error, attempted: targets.length });
+  else sources.push({ name: 'github_pr_detail', ok: true, hydrated, attempted: targets.length });
+  return { authError };
+}
+
 // A PR carrying the `superseded` label points at its successor with an explicit
 // comment («Superseded by #27»). The successor is an exact candidate for the
 // same task; the superseded PR stays visible, marked, so nobody resumes work on
@@ -598,6 +652,8 @@ async function changeFind(input = {}, deps = {}) {
   const branchPulls = await collectBranchPulls({ repo, branches: exactBranches, ghFetch, sources });
   for (const c of branchPulls.candidates) mergeCandidate(candidates, c);
 
+  const hydrated = await hydrateExactPulls({ repo, candidates, ghFetch, sources });
+
   const supersede = await resolveSupersedes({ repo, candidates, ghFetch, sources });
   conflicts.push(...supersede.conflicts);
 
@@ -622,7 +678,7 @@ async function changeFind(input = {}, deps = {}) {
 
   const ordered = [...exact, ...inferred].map((c, index) => ({ ...c, rank: index + 1 }));
 
-  const authError = explicit.authError || search.authError || branchPulls.authError || supersede.authError;
+  const authError = explicit.authError || search.authError || branchPulls.authError || hydrated.authError || supersede.authError;
   if (authError && ordered.length === 0) {
     return {
       ok: false,

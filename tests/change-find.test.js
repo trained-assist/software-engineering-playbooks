@@ -83,6 +83,15 @@ function issue(n, extra = {}) {
   };
 }
 
+// Real /search/issues payloads carry no `head` and no `merged_at` — only the
+// full /pulls/{n} payload does. Tests must not hand search results a `head`,
+// or the hydration path would never be exercised.
+function searchPr(n, extra = {}) {
+  const item = pr(n, extra);
+  delete item.head;
+  return item;
+}
+
 function makeGh(routes, calls = []) {
   const ghFetch = async (rawPath) => {
     const p = decodeURIComponent(String(rawPath));
@@ -277,8 +286,11 @@ test('a branch recorded for the task pulls its PR in as exact', async () => {
   const root = tmpRoot();
   seedWorkspace(root, { rootTaskId: 'ship-it', branch: 'eng/me-ship-it', status: 'code_ready' });
   const { ghFetch } = makeGh([
-    { match: (p) => isHeadSearch(p), value: searchResult([pr(7, { head: 'eng/me-ship-it' })]) },
-    { match: (p) => isThemeSearch(p) && p.includes('type:pr'), value: searchResult([pr(99, { head: 'eng/unrelated' })]) },
+    { match: at(`/repos/${REPO}/pulls/7`), value: pr(7, { head: 'eng/me-ship-it', state: 'closed', merged_at: '2026-10-03T18:00:00Z' }) },
+    { match: (p) => isHeadSearch(p), value: searchResult([searchPr(7)]) },
+    // The same PR also comes back from the thematic search — the live case that
+    // made evidence[0] the weak reason instead of the strong one.
+    { match: (p) => isThemeSearch(p) && p.includes('type:pr'), value: searchResult([searchPr(7), searchPr(99)]) },
     { match: (p) => isThemeSearch(p) && p.includes('type:issue'), value: searchResult([]) },
   ]);
 
@@ -287,7 +299,16 @@ test('a branch recorded for the task pulls its PR in as exact', async () => {
   const fromBranch = r.candidates.find((c) => c.kind === 'pull' && c.ref.number === 7);
   assert.ok(fromBranch, `expected PR #7 from the recorded branch: ${JSON.stringify(r.candidates.map(c => c.identity))}`);
   assert.equal(fromBranch.relation_type, 'exact');
-  assert.ok(fromBranch.evidence.some((e) => e.source === 'branch_match'));
+
+  // Strongest evidence first: a reader of evidence[0] must see WHY it is exact.
+  assert.equal(fromBranch.evidence[0].source, 'branch_match', `got ${JSON.stringify(fromBranch.evidence)}`);
+  assert.ok(fromBranch.evidence.some((e) => e.source === 'github_search'));
+
+  // Hydrated: a squash-merged PR must not read as "closed without merge".
+  assert.equal(fromBranch.ref.head_ref, 'eng/me-ship-it');
+  assert.equal(fromBranch.ref.merged_at, '2026-10-03T18:00:00Z');
+  assert.ok(fromBranch.evidence.some((e) => e.source === 'github_pr_detail'));
+  assert.ok(r.sources.some((s) => s.name === 'github_pr_detail' && s.ok));
 
   const workspace = r.candidates.find((c) => c.kind === 'workspace');
   assert.ok(workspace && workspace.relation_type === 'exact');
