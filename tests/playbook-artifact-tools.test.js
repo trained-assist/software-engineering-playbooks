@@ -131,7 +131,12 @@ test('P14: a write call returns a receipt and does not create a second effect on
   const second = await callTool('engineering_playbook_record_selection', { playbook_id: 'feature', reason: 'mcp test' }, { ...ctx, operationId: 'op-mcp-replay' });
   assert.equal(second.ok, true);
   assert.equal(second.selection.replayed, true);
-  assert.deepEqual(second.effectReceipt, first.effectReceipt);
+  // Повтор возвращает ту же квитанцию. Поле `at` — стенное время провайдера,
+  // поэтому сверяются проверяемые поля, а не весь объект целиком.
+  const { at: _firstAt, ...firstReceipt } = first.effectReceipt;
+  const { at: _secondAt, ...secondReceipt } = second.effectReceipt;
+  assert.deepEqual(secondReceipt, firstReceipt);
+  assert.ok(!Number.isNaN(Date.parse(second.effectReceipt.at)), 'у квитанции остаётся валидное время');
 });
 
 test('P14: the MCP tools never inline playbook step text', () => {

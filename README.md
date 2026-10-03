@@ -796,6 +796,16 @@ Implemented today:
   internal HTTP API over one handler, and a callback inbox that applies every effect exactly
   once. Byte-identical outcome across both facades; event ids, profile and reply context
   survive the trip; see `docs/MCP-INTEGRATION-SANDBOX.md`;
+- execution-plan layer for real playbooks (P24, epic E5 #21, acceptance AC-143): a pinned
+  definition compiles into a concrete plan with stable step IDs (`stp_<sha256(playbookId@
+  artifactHash#stepKey)>`), required gates that cannot be switched off, three distinct wait
+  kinds (user input / external condition / timer), external operation refs (a provider run id
+  is not our runId, dispatch happens once, a lost ACK reconciles without a second dispatch),
+  feature/integration split with an explicit migration dependency, a GTD port whose vocabulary
+  comes from P23 (opt-in control record only, durable ACK with one decision), a simple
+  schedule that stays without GTD, and a checklist that is a view over `planId`. A controlled
+  artifact edit leaves the running plan on its pinned revision and never renames a running
+  step; see `docs/REAL-PLAYBOOKS-PLAN-ADAPTATION.md`;
 - Task Packet contract;
 - CLI surface;
 - MCP surface;
@@ -806,7 +816,8 @@ Implemented today:
 See `docs/WORKSPACE-LIFECYCLE.md` for the workspace contract (E1),
 `docs/DOMAIN-TOOLS-AND-PLAYBOOK-ARTIFACTS.md` for the domain capability/playbook-artifact
 contract (P14), `docs/MCP-INTEGRATION-SANDBOX.md` for the MCP integration sandbox contract
-(P15) and `docs/requirements-log.md` for the current requirements status.
+(P15), `docs/REAL-PLAYBOOKS-PLAN-ADAPTATION.md` for the execution-plan contract (P24) and
+`docs/requirements-log.md` for the current requirements status.
 
 Current priority order:
 
@@ -888,6 +899,9 @@ src/
       trusted-env.js    # host-owned env (profile/task/run/replyContext/bindings), no binding values
   complexity/
     index.js            # deterministic complexity→price engine (base working day × tier-days × multipliers, 3 prices)
+  execution-plans/     # P24: pinned definition → Execution Plan (compiler, step identity,
+                        # adaptation, gates, fake executor, synthetic cloud CI, GTD port,
+                        # simple schedule, runtime, checklist view)
   prompt-domains/       # engineering.md, github.setup.md — read by core's prompt-domains loader
   token-value.js        # mirror of trained-assist-agent src/token-value.js (agent-tokens readers)
 
@@ -895,7 +909,8 @@ templates/githooks/     # pre-commit / pre-push installed by dev_workspace_setup
 templates/ci.yml        # manual test-run workflow for a repo without one (ci-setup drops it in)
 
 contracts/              # incl. playbook.schema.json (vendored Playbook v1),
-                        # playbook-capability.schema.json, playbook-artifact.schema.json
+                        # playbook-capability.schema.json, playbook-artifact.schema.json,
+                        # execution-plan.schema.json (P24 compiled plan)
 library/                # step-types.json — typed step library (sub-steps, ladders, flags)
 playbooks-src/          # feature / debugging / new-software / ci-setup / ci-run / skill-tool / epic-delivery sources
 playbooks/              # built Playbook v1 JSON (+ prose procedures prepare-task, connect-github)
@@ -903,7 +918,8 @@ docs/                   # docs/playbooks/*.md — generated readable playbooks
 examples/
 scripts/                # index-repo.js, manifest-check.js, sandbox/ (incl. ci-cloud-run.mjs,
                         # playbook-artifacts.mjs — P14 domain capability scenario + transcript,
-                        # mcp-integration-sandbox.mjs — P15 MCP integration sandbox + transcript)
+                        # mcp-integration-sandbox.mjs — P15 MCP integration sandbox + transcript,
+                        # real-playbooks.mjs — P24 plan adaptation scenario + transcript)
 ```
 
 Expected future top-level capability areas include workspace management, verification, scheduler/admission, repository intelligence and engineering memory.
