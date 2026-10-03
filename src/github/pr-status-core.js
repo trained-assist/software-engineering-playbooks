@@ -215,9 +215,29 @@ async function deployEvidence(repo, sha) {
   }
 }
 
+// The health endpoint describes ONE service. Which repository it serves is
+// declared here (env override for other deployments); comparing a foreign repo's
+// merge commit against that health commit would manufacture a verdict —
+// `not_yet` for a repo that is not deployed there at all (#112).
+function deliveryRepo() {
+  const override = String(process.env.ENGINEERING_DELIVERY_REPO || '').trim();
+  return override || AGENT_REPO;
+}
+
 // `live` only from health-compare. deploy-job/`merged_at` are evidence, never a
 // verdict — a green deploy job does not prove the merge commit is running.
 async function prodVerdict(repo, mergeCommit) {
+  const target = deliveryRepo();
+  if (target && String(repo || '') !== target) {
+    const ev = await deployEvidence(repo, mergeCommit);
+    return {
+      verdict: 'unknown',
+      evidence: 'prod-endpoint-other-repo',
+      source: ev.source || 'none',
+      delivery_repo: target,
+      deploy_run: ev.deploy_run,
+    };
+  }
   const base = String(process.env.AGENT_PUBLIC_URL || DEFAULT_HEALTH_BASE).replace(/\/+$/, '');
   let health = null;
   try {
@@ -511,4 +531,4 @@ async function issueStatus(repo, issueNumber, opts = {}) {
   };
 }
 
-module.exports = { prStatus, issueStatus, aggregate, linkedPulls, prodVerdict };
+module.exports = { prStatus, issueStatus, aggregate, linkedPulls, prodVerdict, deliveryRepo };

@@ -32,6 +32,10 @@ function storeDirs(workspaceRoot) {
     // same owner scoping and atomic writes as the records above — engineering_
     // change_find/bind must not open a second durable store of their own.
     bindings: path.join(root, 'bindings'),
+    // Verification verdicts per change (#112), written by engineering_verify
+    // and READ by engineering_change_status so «проверено» is a fact on disk,
+    // not a claim in a chat log. Same root, same owner key, same atomic write.
+    verifications: path.join(root, 'verifications'),
     locks: path.join(root, 'locks'),
   };
 }
@@ -152,6 +156,13 @@ function bindingFile(workspaceRoot, bindingKey) {
   return path.join(storeDirs(workspaceRoot).bindings, `${hash(bindingKey)}.json`);
 }
 
+// One verification verdict per owner+repository+change (#112). Same hashed-key
+// discipline as bindings: a change key may contain slashes and never becomes a
+// path segment.
+function verificationFile(workspaceRoot, verificationKey) {
+  return path.join(storeDirs(workspaceRoot).verifications, `${hash(verificationKey)}.json`);
+}
+
 function lockFile(workspaceRoot, key) {
   return path.join(storeDirs(workspaceRoot).locks, `${hash(key)}.lock`);
 }
@@ -179,6 +190,7 @@ module.exports = {
   intentFile,
   workspaceFile,
   bindingFile,
+  verificationFile,
   lockFile,
   listFiles,
 };

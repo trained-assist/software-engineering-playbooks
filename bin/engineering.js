@@ -13,6 +13,7 @@ const { rolloutAutofix, resolveGithubCapability } = require('../src/pr-autofix')
 const { findRepos } = require('../src/repo-catalog');
 const { repoStatus } = require('../src/repo-status');
 const { changeFind, changeBind } = require('../src/change-find');
+const { changeStatus } = require('../src/change-status');
 
 function args(argv) {
   const out = { _: [] };
@@ -47,6 +48,9 @@ const USAGE = [
   '              [--principal <id>]',
   '  change-bind --repo <owner/name> --task-ref <text> --refs <"PR #1, branch x">',
   '              [--principal <id>]',
+  '  change-status --change-ref <#115|branch eng/x|sha abc1234|URL> [--repo <owner/name>]',
+  '                [--workspace-ref <ws-id|path>] [--requirements-ref <issue#112@3>]',
+  '                [--principal <id>]',
   '',
   '  workspace-spawn --root <dir> --source-checkout <git-repo> --base-revision <sha>',
   '                  --principal <id> --host <id> --repo-id <id> --root-task-id <id> --idempotency-key <key>',
@@ -232,6 +236,20 @@ async function main() {
       repo: a.repo,
       task_ref: a['task-ref'],
       refs,
+    }, {
+      principal: a.principal !== undefined && a.principal !== true ? a.principal : (process.env.USER_ID || ''),
+      workspaceRoot: typeof a.root === 'string' ? a.root : undefined,
+    }));
+  } else if (command === 'change-status') {
+    if (!a['change-ref'] || a['change-ref'] === true) {
+      console.error('change-status: pass --change-ref <#115|branch eng/x|sha abc1234|URL>');
+      process.exit(2);
+    }
+    print(await changeStatus({
+      change_ref: a['change-ref'],
+      repo: typeof a.repo === 'string' ? a.repo : undefined,
+      workspace_ref: typeof a['workspace-ref'] === 'string' ? a['workspace-ref'] : undefined,
+      requirements_ref: typeof a['requirements-ref'] === 'string' ? a['requirements-ref'] : undefined,
     }, {
       principal: a.principal !== undefined && a.principal !== true ? a.principal : (process.env.USER_ID || ''),
       workspaceRoot: typeof a.root === 'string' ? a.root : undefined,
