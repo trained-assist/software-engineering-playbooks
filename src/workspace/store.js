@@ -28,6 +28,10 @@ function storeDirs(workspaceRoot) {
     owners: path.join(root, 'owners'),
     intents: path.join(root, 'intents'),
     workspaces: path.join(root, 'workspaces'),
+    // Task → change refs chosen by an owner (#111). Same host-owned store root,
+    // same owner scoping and atomic writes as the records above — engineering_
+    // change_find/bind must not open a second durable store of their own.
+    bindings: path.join(root, 'bindings'),
     locks: path.join(root, 'locks'),
   };
 }
@@ -142,6 +146,12 @@ function workspaceFile(workspaceRoot, workspaceId) {
   return path.join(storeDirs(workspaceRoot).workspaces, `${workspaceId}.json`);
 }
 
+// One binding per owner+repository+task. The key is hashed like operations/
+// owners so free-text task labels never become path segments.
+function bindingFile(workspaceRoot, bindingKey) {
+  return path.join(storeDirs(workspaceRoot).bindings, `${hash(bindingKey)}.json`);
+}
+
 function lockFile(workspaceRoot, key) {
   return path.join(storeDirs(workspaceRoot).locks, `${hash(key)}.lock`);
 }
@@ -168,6 +178,7 @@ module.exports = {
   ownerFile,
   intentFile,
   workspaceFile,
+  bindingFile,
   lockFile,
   listFiles,
 };
