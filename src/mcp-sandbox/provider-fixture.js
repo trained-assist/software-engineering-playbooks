@@ -1,0 +1,374 @@
+'use strict';
+
+// Фикстура внешнего доменного сервиса для P15 (эпик E5 #21, этап I04, карточка #54).
+//
+// Это ЭМУЛЯТОР внешнего сервиса, у которого нет provider sandbox: контрактный
+// сэмпл очищен от персональных данных, авторизация и квоты не настоящие. Так и
+// требует приёмка карточки: «для unsupported external sandbox строится emulator, не
+// ждать production testing» (SANDBOX.md: «passing emulator не называется успешным
+// live provider test»).
+//
+// Что здесь проверяется по-настоящему:
+//   - внешний эффект на диске изолированного root (запись решения), а не заглушка;
+//   - happens-once по operationId: повтор возвращает ту же квитанцию;
+//   - пять управляемых сбоев: success / error / delay / auth expiry / duplicate
+//     callbacks (плюс unreachable как шестой, «сервис не отвечает»);
+//   - поздняя выдача квитанции после delay и reconcile по operationId;
+//   - обратные вызовы внешнего сервиса (callbacks), включая дубликаты: эмулятор
+//     отправляет их настоящим HTTP POST в inbox хоста, а не «просто пишет в лог».
+//
+// Чего фикстура НЕ доказывает: свойства живого провайдера (см. fidelity).
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const STORE_DIR = 'applications';
+const PROVIDER_NAME = 'recruiting-external';
+
+// Пять сценариев приёмки + «сервис недоступен». Имена совпадают с формулировками
+// карточки P15, чтобы в логе и транскрипте не появлялся второй словарь.
+const FAULT_MODES = ['success', 'error', 'delay', 'auth_expiry', 'duplicate_callback', 'unreachable'];
+
+const DEFAULT_DELAY_MS = 900;
+
+// Сэмпл внешнего контракта: синтетика без персональных данных. Внешний сервис в
+// бою отдаст живые данные; песочница не имеет права притворяться, что проверила их.
+const SANITIZED_SAMPLE = {
+  searchId: 'search-demo-1',
+  vacancy: {
+    title: 'Software Engineer (sandbox sample)',
+    openedAt: '2026-09-01T09:00:00.000Z',
+    closedAt: null,
+    schedule: 'remote',
+  },
+  funnel: { total: 4, byStage: { applied: 1, screening: 2, interview: 1, offer: 0 } },
+  applications: [
+    { applicationId: 'app-demo-1', stage: 'screening' },
+    { applicationId: 'app-demo-2', stage: 'applied' },
+  ],
+  updatedAt: '2026-10-03T09:00:00.000Z',
+  source: 'sanitized-sample',
+  containsPersonalData: false,
+};
+
+// Имена переменных живого smoke. Только имена: значения живут в GCP Secret Manager
+// или GitHub Actions secrets (SANDBOX.md, «Credentials и bindings»).
+const REQUIRED_LIVE_BINDINGS = ['EXTERNAL_TEST_ACCOUNT_TOKEN', 'EXTERNAL_TEST_ACCOUNT_ID'];
+
+function digest(...parts) {
+  return crypto.createHash('sha256').update(parts.join('|')).digest('hex');
+}
+
+function short(hash, length = 12) {
+  return hash.slice(0, length);
+}
+
+function eventIdFor(scope, key) {
+  return `evt_${short(digest('event', scope, key))}`;
+}
+
+function receiptIdFor(operationId, payloadHash) {
+  return `rcpt_${short(digest('receipt', operationId, payloadHash), 16)}`;
+}
+
+function externalRefFor(operationId) {
+  return `app_${short(digest('external', operationId))}`;
+}
+
+function callbackIdFor(operationId, index) {
+  return `cb_${short(digest('callback', operationId, String(index)))}`;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Синхронная пауза без вращения CPU: эмулирует «сервис принял запрос и не отвечает».
+// Нужна именно синхронная — транспорт должен остаться неотвечающим до дедлайна клиента.
+function blockFor(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Чтение записи внешнего сервиса. Различаем «записи нет» и «запись нечитаема»:
+ * второе — это повреждённое состояние, которое нельзя трактовать как «эффекта не было»,
+ * иначе повтор создаст второй эффект (ловушка PR-04).
+ */
+function readRecord(file) {
+  if (!fs.existsSync(file)) return { state: 'missing' };
+  try {
+    return { state: 'ok', record: JSON.parse(fs.readFileSync(file, 'utf8')) };
+  } catch {
+    return { state: 'corrupt' };
+  }
+}
+
+/**
+ * @param {object} options
+ * @param {string} options.root изолированный каталог песочницы (прод-хранилище неприкосновенно)
+ * @param {() => Date} [options.clock]
+ * @param {string} [options.fault] один из FAULT_MODES
+ * @param {number} [options.delayMs] задержка ответа в сценарии delay (должна превышать клиентский дедлайн)
+ * @param {string} [options.callbackUrl] база inbox'а хоста для обратных вызовов (http://127.0.0.1:port)
+ * @param {string} [options.callbackToken] токен внешнего сервиса для inbox'а (не токен хоста)
+ * @param {(url: string, body: object, headers: object) => Promise<any>} [options.postJson] подмена HTTP-клиента (тесты)
+ */
+function createRecruitingProviderFixture({ root, clock = () => new Date(), fault = 'success', delayMs = DEFAULT_DELAY_MS, callbackUrl = '', callbackToken = '', postJson } = {}) {
+  if (!root) throw new Error('provider fixture requires an isolated root (never a production data root)');
+  if (!FAULT_MODES.includes(fault)) throw new Error(`unknown fault "${fault}"; expected one of ${FAULT_MODES.join('|')}`);
+
+  const dir = path.join(root, STORE_DIR);
+  const postedCallbacks = [];
+  const deliveryLog = [];
+
+  function storeFor(operationId) {
+    return path.join(dir, `${short(digest('store', operationId), 32)}.json`);
+  }
+
+  /**
+   * Атомарная запись: сначала во временный файл, затем rename. Два процесса-фасада
+   * могут работать с одним store, и оборванный write иначе прочитался бы как
+   * «записи нет» — то есть повтор создал бы второй эффект.
+   */
+  function write(record) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const target = storeFor(record.operationId);
+    const temp = `${target}.tmp-${process.pid}`;
+    fs.writeFileSync(temp, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+    fs.renameSync(temp, target);
+    return record;
+  }
+
+  function lookup(operationId) {
+    const { state, record } = readRecord(storeFor(operationId));
+    if (state !== 'ok') return { found: false, applied: false, receiptId: null, externalRef: null, receiptPending: false, state };
+    return {
+      found: true,
+      applied: true,
+      externalRef: record.externalRef,
+      receiptId: record.receipt ? record.receipt.receiptId : null,
+      receiptPending: !record.receipt,
+      eventId: record.eventId,
+      at: record.at,
+    };
+  }
+
+  const defaultPost = async (url, body, headers) => {
+    const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+    const text = await response.text();
+    try {
+      return { status: response.status, body: JSON.parse(text) };
+    } catch {
+      return { status: response.status, body: { raw: text.slice(0, 200) } };
+    }
+  };
+  const post = postJson || defaultPost;
+
+  /**
+   * Обратный вызов внешнего сервиса. Дубликаты в этом и есть проверка: эмулятор
+   * отправляет тот же callback повторно (тот же callbackId) и один раз — с новым
+   * callbackId, но тем же operationId. Inbox хоста обязан применить эффект один раз.
+   */
+  async function deliverCallback(record, { duplicates = false } = {}) {
+    const base = {
+      callbackId: callbackIdFor(record.operationId, 0),
+      provider: PROVIDER_NAME,
+      kind: 'application.decision.recorded',
+      eventId: record.eventId,
+      operationId: record.operationId,
+      externalRef: record.externalRef,
+      profileId: record.profileId,
+      applicationId: record.applicationId,
+      decision: record.decision,
+      occurredAt: record.at,
+      replyContext: record.replyContext || null,
+    };
+    const batch = duplicates
+      ? [base, { ...base }, { ...base, callbackId: callbackIdFor(record.operationId, 1) }]
+      : [base];
+
+    const deliveries = [];
+    for (const [index, envelope] of batch.entries()) {
+      // Повтор приходит позже оригинала — как в жизни, когда ретрай вебхука обгоняет
+      // первую доставку.
+      if (index > 0) await sleep(20);
+      let result = { status: 0, body: { applied: false, duplicate: false, reason: 'NO_CALLBACK_URL' } };
+      if (callbackUrl) {
+        try {
+          result = await post(`${callbackUrl}/v1/callbacks`, envelope, callbackToken ? { authorization: `Bearer ${callbackToken}` } : {});
+        } catch (e) {
+          result = { status: 0, body: { applied: false, duplicate: false, reason: 'CALLBACK_TRANSPORT_FAILED' } };
+        }
+      }
+      const entry = {
+        callbackId: envelope.callbackId,
+        operationId: envelope.operationId,
+        eventId: envelope.eventId,
+        applied: Boolean(result.body && result.body.applied),
+        duplicate: Boolean(result.body && result.body.duplicate),
+        httpStatus: result.status,
+        reason: result.body && result.body.reason ? result.body.reason : null,
+      };
+      postedCallbacks.push(entry);
+      deliveryLog.push(entry);
+      deliveries.push(entry);
+    }
+    return {
+      posted: deliveries.length,
+      // Сколько доставок реально применили эффект. Дубликаты сюда не попадают:
+      // ровно одна доставка на операцию, остальные — отброшенные повторы.
+      applied: deliveries.filter(d => d.applied).length,
+      duplicatesIgnored: deliveries.filter(d => d.duplicate).length,
+      unacknowledged: deliveries.filter(d => !d.applied && !d.duplicate).length,
+      callbackIds: deliveries.map(d => d.callbackId),
+    };
+  }
+
+  const fidelity = {
+    provider: PROVIDER_NAME,
+    mode: 'emulator',
+    liveSandbox: 'unsupported',
+    reason: 'the external service ships no provider sandbox or webhook environment, so the stage is verified against an emulator with a sanitized contract sample',
+    sanitizedSample: true,
+    containsPersonalData: false,
+    emulatedProperties: ['auth per operation', 'quota / rate limit', 'real webhook delivery', 'real vacancy pipeline data'],
+    liveSmoke: {
+      performed: false,
+      required: [
+        'read-only search status of a test search owned by the sandbox test account',
+        'real token lifetime/refresh behaviour (auth expiry fixture is synthetic here)',
+        'real free-tier quota and rate-limit responses',
+        'real webhook/callback delivery in place of the emulated inbox',
+      ],
+      bindingNames: [...REQUIRED_LIVE_BINDINGS],
+      bindingSource: 'GCP Secret Manager or GitHub Actions secrets; never a production token',
+      rule: 'a green emulator run is not a live provider test — performed stays false until a test-account read exists',
+    },
+  };
+
+  /**
+   * Заявка на живой read-операции. Сейчас честно отвечает «заблокировано»: тестового
+   * аккаунта нет, а первый реальный домен ещё не выбран (эпик #21). Наличие эмулятора
+   * означает, что ждать прод-тестирования не нужно, а не что живое свойство доказано.
+   */
+  function requestLiveSmoke({ bindingNames = [] } = {}) {
+    const missing = REQUIRED_LIVE_BINDINGS.filter(name => !bindingNames.includes(name));
+    if (missing.length > 0) {
+      return { attempted: true, performed: false, blockedBy: 'NO_TEST_ACCOUNT_BINDING', missingBindings: missing, next: 'declare these names in Secret Manager / GitHub Actions secrets, then run the read-only live smoke with a sandbox-owned account' };
+    }
+    return { attempted: true, performed: false, blockedBy: 'LIVE_PROVIDER_CLIENT_NOT_BUILT', missingBindings: [], next: 'the emulator is the accepted evidence for this stage; a live client needs the owner decision on the first real domain (epic #21)' };
+  }
+
+  return {
+    root,
+    fault,
+    dir,
+    fidelity,
+    postedCallbacks,
+    deliveryLog,
+    requestLiveSmoke,
+
+    readSearchStatus({ searchId, bindingValue } = {}) {
+      if (!bindingValue) return { status: 'blocked', reason: 'credential binding value is empty; the provider cannot authenticate the read' };
+      if (fault === 'unreachable') return { status: 'unreachable' };
+      if (fault === 'auth_expiry') return { status: 'blocked', reason: 'provider rejected the credential binding: expired' };
+      if (fault === 'error') return { status: 'error', code: 'PROVIDER_ERROR', detail: 'external service returned a server error on read' };
+      if (fault === 'delay') {
+        // Синхронная пауза внутри async-обработчика: транспорт остаётся
+        // неотвечающим до дедлайна клиента, ответ приходит позже.
+        blockFor(delayMs);
+        return { status: 'late', eventId: eventIdFor('read', searchId), data: { ...SANITIZED_SAMPLE, searchId: String(searchId) } };
+      }
+      if (String(searchId) !== SANITIZED_SAMPLE.searchId) {
+        return { status: 'error', code: 'PROVIDER_NOT_FOUND', detail: `no sanitized sample for search "${searchId}"` };
+      }
+      return { status: 'ok', eventId: eventIdFor('read', String(searchId)), data: { ...SANITIZED_SAMPLE } };
+    },
+
+    /**
+     * Внешнее действие: решение по отклику. Эффект происходит на диске ДО выдачи
+     * квитанции (так ведёт себя внешний сервис) и ДО отправки обратного вызова —
+     * именно поэтому повтор вслепую опасен, а reconcile обязателен.
+     */
+    async decideApplication({ operationId, profileId, applicationId, decision, bindingRef, bindingScope, bindingValue, replyContext } = {}) {
+      if (!bindingValue) return { status: 'blocked', reason: 'credential binding value is empty; the provider cannot authenticate the write' };
+      if (fault === 'unreachable') return { status: 'unreachable' };
+      if (fault === 'auth_expiry') return { status: 'blocked', reason: 'provider rejected the credential binding: expired' };
+
+      const payload = { applicationId: String(applicationId), decision: String(decision) };
+      const payloadHash = short(digest('payload', JSON.stringify(payload)), 32);
+      const existing = readRecord(storeFor(operationId));
+      if (existing.state === 'corrupt') {
+        return { status: 'corrupt', code: 'PROVIDER_STATE_UNREADABLE', detail: 'the external service has an unreadable record for this operationId; no second effect was produced', lookup: lookup(operationId) };
+      }
+      if (existing.state === 'ok') {
+        const record = existing.record;
+        if (record.payloadHash !== payloadHash) {
+          return { status: 'conflict', existingPayloadHash: record.payloadHash, requestedPayloadHash: payloadHash, lookup: lookup(operationId) };
+        }
+        if (record.receiptPending) return { status: 'pending', lookup: lookup(operationId) };
+        // Повтор внешнего сервиса обычно переотправляет и обратный вызов: inbox хоста
+        // обязан отбросить его как дубликат, а не создать второе действие.
+        const delivery = await deliverCallback(record, { duplicates: fault === 'duplicate_callback' });
+        return { status: 'replayed', receipt: record.receipt, lookup: lookup(operationId), eventId: record.eventId, delivery };
+      }
+
+      if (fault === 'error') {
+        return { status: 'error', code: 'PROVIDER_ERROR', detail: 'external service rejected the write with a server error', lookup: lookup(operationId) };
+      }
+
+      const at = clock().toISOString();
+      const record = {
+        operationId,
+        payloadHash,
+        profileId,
+        bindingRef,
+        bindingScope,
+        applicationId: payload.applicationId,
+        decision: payload.decision,
+        replyContext: replyContext || null,
+        eventId: eventIdFor('write', operationId),
+        externalRef: externalRefFor(operationId),
+        at,
+        receiptPending: true,
+        receipt: null,
+        delivery: null,
+      };
+      write(record);
+
+      const issueReceipt = () => {
+        const receipt = { receiptId: receiptIdFor(operationId, payloadHash), externalRef: record.externalRef, at };
+        write({ ...record, receiptPending: false, receipt });
+        return receipt;
+      };
+
+      if (fault === 'delay') {
+        // Ответ и квитанция приходят позже клиентского дедлайна: вызывающий видит
+        // неизвестный исход, эффект уже применён. Квитанция «догоняет» позже, и
+        // reconcile по operationId возвращает её вместо повторного эффекта.
+        await sleep(delayMs);
+        const receipt = issueReceipt();
+        const delivery = await deliverCallback(record, { duplicates: fault === 'duplicate_callback' });
+        return { status: 'applied_late', receipt, lookup: lookup(operationId), eventId: record.eventId, delivery };
+      }
+
+      const receipt = issueReceipt();
+      const delivery = await deliverCallback(record, { duplicates: fault === 'duplicate_callback' });
+      return { status: 'applied', receipt, lookup: lookup(operationId), eventId: record.eventId, delivery };
+    },
+
+    lookup,
+    count: () => (fs.existsSync(dir) ? fs.readdirSync(dir).filter(file => file.endsWith('.json')).length : 0),
+  };
+}
+
+module.exports = {
+  createRecruitingProviderFixture,
+  FAULT_MODES,
+  STORE_DIR,
+  PROVIDER_NAME,
+  REQUIRED_LIVE_BINDINGS,
+  SANITIZED_SAMPLE,
+  DEFAULT_DELAY_MS,
+};

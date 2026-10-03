@@ -5,3 +5,6 @@ coverage/
 .engineering/index/
 
 .sandbox/
+
+# P15 scratch (локальная отладка, не в коммитах)
+_scratch/

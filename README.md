@@ -790,6 +790,12 @@ Implemented today:
   verified effect receipt from a sandboxed provider, idempotent by operationId, advisory
   without gtdId). One handler, two transport facades (MCP + internal API); see
   `docs/DOMAIN-TOOLS-AND-PLAYBOOK-ARTIFACTS.md`;
+- MCP integration sandbox for an external domain without a provider sandbox (P15, epic E5
+  #21, acceptance AC-117): an emulator of the external service with provider fixtures
+  (success/error/delay/auth expiry/duplicate callbacks), a real MCP stdio server and a real
+  internal HTTP API over one handler, and a callback inbox that applies every effect exactly
+  once. Byte-identical outcome across both facades; event ids, profile and reply context
+  survive the trip; see `docs/MCP-INTEGRATION-SANDBOX.md`;
 - Task Packet contract;
 - CLI surface;
 - MCP surface;
@@ -799,7 +805,8 @@ Implemented today:
 
 See `docs/WORKSPACE-LIFECYCLE.md` for the workspace contract (E1),
 `docs/DOMAIN-TOOLS-AND-PLAYBOOK-ARTIFACTS.md` for the domain capability/playbook-artifact
-contract (P14) and `docs/requirements-log.md` for the current requirements status.
+contract (P14), `docs/MCP-INTEGRATION-SANDBOX.md` for the MCP integration sandbox contract
+(P15) and `docs/requirements-log.md` for the current requirements status.
 
 Current priority order:
 
@@ -864,6 +871,21 @@ src/
     artifact.js         # pinned playbooks/<id>.json resolution: path + sha256 + schema check
     provider.js         # sandboxed fake provider: receipts, happens-once, reconcile by operationId
     events.js           # I04 event log (correlation ids, event key, transition reason, redaction)
+  mcp-sandbox/
+    index.js            # sandbox domain host: capability contract + event log + emulator + inbox
+    capabilities.js     # domain capability host (P13 contract): search_status / decide_application
+    provider-fixture.js # emulator of an external service without a provider sandbox:
+                        # success/error/delay/auth expiry/duplicate callbacks, disk effect,
+                        # happens-once by operationId, late receipt, HTTP callbacks, fidelity
+    callback-inbox.js   # callback receiver: dedupe by callbackId AND operationId, one status message
+    errors.js           # P13/P14 codes + provider codes (no second error vocabulary)
+    client.js           # stdio JSON-RPC + HTTP clients, canonical outcome fingerprint (AC-117)
+    transports/
+      jsonrpc.js        # JSON-RPC 2.0 framing + P13 error codes (-32001 tool_not_in_scope, …)
+      stdio-server.js   # MCP stdio server (per-run child process, startup fails on expired binding)
+      http-server.js    # internal API facade + callback inbox on loopback
+      tool-surface.js   # tool contract only; invokes the shared capability logic
+      trusted-env.js    # host-owned env (profile/task/run/replyContext/bindings), no binding values
   complexity/
     index.js            # deterministic complexity→price engine (base working day × tier-days × multipliers, 3 prices)
   prompt-domains/       # engineering.md, github.setup.md — read by core's prompt-domains loader
@@ -880,7 +902,8 @@ playbooks/              # built Playbook v1 JSON (+ prose procedures prepare-tas
 docs/                   # docs/playbooks/*.md — generated readable playbooks
 examples/
 scripts/                # index-repo.js, manifest-check.js, sandbox/ (incl. ci-cloud-run.mjs,
-                        # playbook-artifacts.mjs — P14 domain capability scenario + transcript)
+                        # playbook-artifacts.mjs — P14 domain capability scenario + transcript,
+                        # mcp-integration-sandbox.mjs — P15 MCP integration sandbox + transcript)
 ```
 
 Expected future top-level capability areas include workspace management, verification, scheduler/admission, repository intelligence and engineering memory.
