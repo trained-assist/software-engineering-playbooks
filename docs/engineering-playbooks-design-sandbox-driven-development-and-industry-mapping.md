@@ -1,5 +1,11 @@
 # Инженерные плейбуки: дизайн, sandbox-driven development и сверка с индустрией
 
+> **Историческая версия на 2026-09-27.** На тот момент было 3 плейбука; сейчас их 7
+> (`feature`, `debugging`, `new-software`, `ci-setup`, `ci-run`, `skill-tool`,
+> `epic-delivery`), а библиотека шагов — 32 типа. `archive` с тех пор изменился: статус
+> требований ведётся в issues (правило владельца 2026-09-28), а не в
+> `docs/requirements-log.md`. Читать как снимок решения, не как текущую политику.
+>
 > Исходник — черновик владельца «Software Engineering Playbooks» (2026-09-27).
 > Исполняемые плейбуки: `playbooks/{feature,debugging,new-software}.json`
 > (генерируются из `playbooks-src/` + `library/step-types.json`, см. README).
