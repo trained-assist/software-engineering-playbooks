@@ -376,6 +376,43 @@
       "effect": "write",
       "requiresApproval": false,
       "retrySafety": "idempotent"
+    },
+    {
+      "name": "engineering_repo_find",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "refresh": {
+            "type": "boolean"
+          },
+          "include_archived": {
+            "type": "boolean"
+          }
+        }
+      },
+      "allowedTriggers": [
+        "user",
+        "cron",
+        "system"
+      ],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
     }
   ],
   "contextFields": [],

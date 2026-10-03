@@ -10,6 +10,7 @@ const {
   WorkspaceError,
 } = require('../src/workspace');
 const { rolloutAutofix, resolveGithubCapability } = require('../src/pr-autofix');
+const { findRepos } = require('../src/repo-catalog');
 
 function args(argv) {
   const out = { _: [] };
@@ -33,6 +34,9 @@ const USAGE = [
   'Usage: trained-engineering <command> [options]',
   '',
   '  prepare-task --repo <path> --task <text> [--max-results 24] [--no-index]',
+  '',
+  '  repo-find --query <text> [--scope visible|org:<name>|user:<name>] [--limit 10]',
+  '            [--cursor <n>] [--refresh] [--include-archived]',
   '',
   '  workspace-spawn --root <dir> --source-checkout <git-repo> --base-revision <sha>',
   '                  --principal <id> --host <id> --repo-id <id> --root-task-id <id> --idempotency-key <key>',
@@ -145,6 +149,19 @@ async function main() {
     });
     if (a.json) print(result);
     else printRollout(result);
+  } else if (command === 'repo-find') {
+    if (!a.query || a.query === true) {
+      console.error('repo-find: pass --query <text>');
+      process.exit(2);
+    }
+    print(await findRepos({
+      query: a.query,
+      scope: a.scope,
+      limit: a.limit !== undefined && a.limit !== true ? Number(a.limit) : undefined,
+      cursor: a.cursor !== undefined && a.cursor !== true ? String(a.cursor) : undefined,
+      refresh: a.refresh === true,
+      include_archived: a['include-archived'] === true,
+    }));
   } else {
     console.error(USAGE);
     process.exit(2);

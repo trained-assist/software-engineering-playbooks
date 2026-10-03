@@ -1,0 +1,7 @@
+{
+  "$comment": "definitions-источник для engineering_repo_find (#108). aliases — прошлые имена после rename (один stable repo ID, не дубль); purposes — уточнение назначения, derived:true только если текст извлечён моделью. Происхождение каждого значения — этот файл; поле отсутствует — берётся описание репозитория с GitHub (source: github).",
+  "aliases": {
+    "trained-assist/software-engineering-playbooks": ["trained-assist-engineering", "engineering playbooks"]
+  },
+  "purposes": {}
+}
