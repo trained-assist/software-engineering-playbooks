@@ -404,6 +404,24 @@ test('сценарий duplicate callbacks: три доставки — одно
   }
 });
 
+test('повреждённая запись внешнего сервиса — fail-closed, а не второй эффект', async () => {
+  const sandbox = await startSandbox({});
+  try {
+    const first = await sandbox.call('sandbox_recruiting_decide_application', { application_id: 'app-demo-1', decision: 'advance' });
+    assert.equal(first.kind, 'completed');
+    const storeDir = path.join(sandbox.dataRoot, 'provider', 'applications');
+    const file = path.join(storeDir, fs.readdirSync(storeDir)[0]);
+    fs.writeFileSync(file, '{ повреждено', { mode: 0o600 });
+
+    const second = await sandbox.call('sandbox_recruiting_decide_application', { application_id: 'app-demo-1', decision: 'advance' });
+    assert.equal(second.kind, 'technical_error');
+    assert.equal(second.code, 'PROVIDER_STATE_UNREADABLE');
+    assert.equal(fs.readdirSync(storeDir).length, 1, 'повреждённая запись не перезаписана вторым эффектом');
+  } finally {
+    await sandbox.stop();
+  }
+});
+
 test('сценарий unreachable: типизированная техническая ошибка, эффекта нет', async () => {
   const sandbox = await startSandbox({ fault: 'unreachable' });
   try {

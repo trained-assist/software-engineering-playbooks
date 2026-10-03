@@ -360,6 +360,20 @@ for (const mode of ['success', 'error', 'delay', 'auth_expiry', 'duplicate_callb
 }
 
 {
+  const sandbox = await startSandbox({ name: 'corrupt-record' });
+  await sandbox.stdio.call('initialize', { protocolVersion: '2025-06-18', capabilities: {} });
+  sandbox.stdio.notify('notifications/initialized', {});
+  const first = await sandbox.mcp('sandbox_recruiting_decide_application', { application_id: 'app-demo-1', decision: 'advance' });
+  const storeDir = path.join(sandbox.dataRoot, 'provider', 'applications');
+  const file = path.join(storeDir, fs.readdirSync(storeDir)[0]);
+  fs.writeFileSync(file, '{ повреждено', { mode: 0o600 });
+  const second = await sandbox.mcp('sandbox_recruiting_decide_application', { application_id: 'app-demo-1', decision: 'advance' });
+  note(`corrupt record: kind=${second.kind} code=${second.code} store files=${fs.readdirSync(storeDir).length}`);
+  check(second.kind === 'technical_error' && second.code === 'PROVIDER_STATE_UNREADABLE', 'повреждённая запись внешнего сервиса — fail-closed, а не второй эффект');
+  check(fs.readdirSync(storeDir).length === 1, 'повреждённая запись не перезаписана вторым эффектом');
+}
+
+{
   const sandbox = await startSandbox({ name: 'unreachable', fault: 'unreachable' });
   const outcome = await sandbox.api('sandbox.recruiting.search_status', { search_id: 'search-demo-1' });
   check(outcome.kind === 'technical_error' && outcome.code === 'PROVIDER_UNREACHABLE', 'unreachable: недоступный сервис — типизированная ошибка');

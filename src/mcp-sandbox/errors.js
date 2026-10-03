@@ -18,7 +18,7 @@ const {
 // Исходы внешнего сервиса, которых нет в P14: типизированная ошибка чтения/записи и
 // отсутствующий ресурс. AUTH_EXPIRED намеренно НЕ код: истёкшая выдача — это blocked с
 // человеческим текстом (решение владельца не подменяем машинным кодом для модели).
-const PROVIDER_CODES = ['PROVIDER_ERROR', 'PROVIDER_NOT_FOUND'];
+const PROVIDER_CODES = ['PROVIDER_ERROR', 'PROVIDER_NOT_FOUND', 'PROVIDER_STATE_UNREADABLE'];
 
 const CODES = [...CAPABILITY_CODES, ...ARTIFACT_CODES, ...EFFECT_CODES, ...PROVIDER_CODES];
 

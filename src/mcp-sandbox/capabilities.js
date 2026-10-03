@@ -342,6 +342,10 @@ function createCapabilityHost({ provider, log, bindingResolver } = {}) {
       log?.write('capability.refused', { ...correlation, from: 'validated', to: 'refused', reasonCode: 'PROVIDER_AUTH_EXPIRED', detail: applied.reason });
       return refusal('PROVIDER_AUTH_EXPIRED', applied.reason);
     }
+    if (applied.status === 'corrupt') {
+      log?.write('capability.failed', { ...correlation, from: 'validated', to: 'failed', reasonCode: 'PROVIDER_STATE_UNREADABLE', detail: applied.detail || null });
+      return technicalError('PROVIDER_STATE_UNREADABLE');
+    }
     if (applied.status === 'conflict') {
       log?.write('capability.failed', { ...correlation, from: 'validated', to: 'failed', reasonCode: 'REPLAY_CONFLICT', detail: 'operationId already recorded a different decision; no second effect was produced' });
       return technicalError('REPLAY_CONFLICT', { effectStateUnknown: false, reconcile: { operationId: correlation.operationId } });

@@ -227,8 +227,11 @@ function createHttpApiServer({ host, trusted, env, inbox, log, port = 0, hostTok
   function close() {
     return new Promise(resolve => {
       for (const socket of sockets) socket.destroy();
-      server.close(() => resolve());
-      setTimeout(() => resolve(), 250);
+      const timer = setTimeout(() => resolve(), 250);
+      server.close(() => {
+        clearTimeout(timer);
+        resolve();
+      });
     });
   }
 
