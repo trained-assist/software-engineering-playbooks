@@ -128,7 +128,9 @@ node --test tests/playbooks.test.js
 
 ## Adding a New Step Type
 
-1. Add to `library/step-types.json` with `role`, `level`, `budget`, `done_when`
+1. Add to `library/step-types.json` with `executor_role`, `minimum_model_level`,
+   `context_budget`, `validation`, `substeps`, `done_when` (see the existing types for the
+   exact shape; `title`/`purpose`/`openspec` are required too)
 2. Run `npm run build:playbooks` to rebuild
 3. Add to a playbook in `playbooks-src/`
 4. `npm run check:playbooks` to verify freshness
@@ -145,12 +147,10 @@ node --test tests/playbooks.test.js
 
 ## Edge-Case Testing (on VM)
 
-For testing runtime behavior with bad state, use the edge-case runner on the VM:
-
-```bash
-# Upload and run
-cat edge-case-runner.js | ssh vova@136.65.7.197 'cat > /tmp/edge.js && node /tmp/edge.js'
-```
+There is no `edge-case-runner.js` in this repo. Runtime edge cases (corrupt `evidence_json`,
+skipping running/done items, deleting a task with child items, concurrent claim races) belong to
+the durable runtime and are covered by the agent repo's test suite (`trained-assist-agent/test/`).
+This repo's own process checks are `npm test` and the sandbox scripts under `scripts/sandbox/`.
 
 This tests:
 - Corrupt evidence_json

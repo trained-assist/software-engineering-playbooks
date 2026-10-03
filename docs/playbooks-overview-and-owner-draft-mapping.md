@@ -56,7 +56,7 @@
 | 10 | Доставка и подтверждение | PR смержен | `merged` | код (без LLM) | — | — | — | `merged` | опрос каждые 5 мин, до 24 ч |
 | 11 | Доставка и подтверждение | Деплой прошёл и живой | `deployed` | проверяющий | bachelor → Go deepseek | small | 15 мин | `deployed_version_is_live` |  |
 | 12 | Доставка и подтверждение | Подтвердить, что ошибка ушла в проде | `confirm-fixed` | проверяющий | bachelor → Go deepseek | small | 15 мин | `error_gone_in_production` |  |
-| 13 | Архивация и разбор | Архивация: обновить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 13 | Архивация и разбор | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
 ### `epic-delivery` — Довести эпик/план архитектуры до конца (мета-цикл) (8 шагов)
 
@@ -69,7 +69,7 @@
 | 5 | Итерация: карточка → песочница → кросс-ревью → план | Обновление плана архитектуры по итогам ревью | `architecture-update` | разработчик | doctor → Claude → Codex → opencode doctor | large | 30 мин | `plan_updated_from_this_iteration_child_verdict`, `pr_merged` |  |
 | 6 | Итерация: карточка → песочница → кросс-ревью → план | Цикл или финиш | `loop-or-finish` | разработчик | master → Go deepseek | medium | 15 мин | `next_iteration_complete_in_order_or_loop_finished` |  |
 | 7 | Финальная приёмка | Финальная приёмка по чек-листу | `final-acceptance` | проверяющий | doctor → Claude → Codex → opencode doctor | large | 40 мин | `acceptance_checklist_run_and_report_published_or_continuation_added` | уведомить владельца |
-| 8 | Архивация | Архивация: обновить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 8 | Архивация | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
 ### `feature` — Фича или изменение в существующем продукте (15 шагов)
 
@@ -89,7 +89,7 @@
 | 12 | Доставка и проверка в реальности | Деплой прошёл и живой | `deployed` | проверяющий | bachelor → Go deepseek | small | 15 мин | `deployed_version_is_live` |  |
 | 13 | Доставка и проверка в реальности | Проверка сценария в реальном окружении | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
 | 14 | Доставка и проверка в реальности | Наблюдение после релиза (если нужно) | `observe` | проверяющий | bachelor → Go deepseek | small | 15 мин | `post_release_observation_done_or_not_needed` |  |
-| 15 | Архивация | Архивация: обновить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 15 | Архивация | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
 ### `new-software` — Новый софт или модуль с нуля (Playbook Zero) (16 шагов)
 
@@ -110,7 +110,7 @@
 | 13 | В реальное окружение | PR смержен | `merged` | код (без LLM) | — | — | — | `merged` | опрос каждые 5 мин, до 24 ч |
 | 14 | В реальное окружение | Из песочницы в реальное окружение | `go-live` | разработчик | master → Go deepseek | medium | 30 мин | `running_in_real_environment` |  |
 | 15 | В реальное окружение | Проверка сценария в реальном окружении | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
-| 16 | Архивация и следующие шаги | Архивация: обновить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 16 | Архивация и следующие шаги | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
 ### `skill-tool` — Новый MCP-инструмент в доменном скиле (15 шагов)
 
@@ -130,7 +130,7 @@
 | 12 | Доставка и проверка в реальности | Деплой прошёл и живой | `deployed` | проверяющий | bachelor → Go deepseek | small | 1 ч | `deployed_version_is_live` |  |
 | 13 | Доставка и проверка в реальности | Тул виден в новой сессии | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
 | 14 | Доставка и проверка в реальности | Реальный вызов в живой сессии | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
-| 15 | Архивация | Архивация: обновить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 15 | Архивация | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
 ## Сверка с черновиком владельца
 

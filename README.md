@@ -48,8 +48,33 @@ playbook_run(playbook_id, goal, vars: {repo}) → draft durable plan → task_up
 Editing a process: change the library (shared sub-steps) or the source (playbook-specific notes/overrides),
 run `npm run build:playbooks`, open a PR. Running plans are pinned to `playbook_id@version` — bump `version`
 when you change what a step means. The runtime contract (durable waits, validators) lives in
-`trained-assist-agent` (`docs/specs/durable-wait-until.md`); `contracts/playbook.schema.json` here is a copy
-of that repo's schema — keep them in sync.
+`trained-assist-agent` (`src/durable-wait.js`, `src/playbook-validators.js`, `src/playbook-compiler.js`);
+`contracts/playbook.schema.json` here is a copy of that repo's schema — keep them in sync.
+
+### Where the policy is actually enforced
+
+Two layers declare policy here; only one of them runs in production. Read this before trusting any
+"cannot be disabled" / "required gate" / "receipt" wording below.
+
+- **Live (trained-assist-agent):** `durable-task-store.js` + `gtd-controller.js`. They consume the
+  compiled plan: step `validation` (18-key registry in `playbook-validators.js`), step/playbook
+  `hooks`, declared `wait` (`poll_every_sec` / `timeout_sec`, deterministic, no model call),
+  `execution_timeout_seconds`, `max_attempts`, `executor_role`, `minimum_model_level`.
+  Two fields are **declared but inert**: `defaults.recovery_policy` (dropped by the compiler — no
+  column, no reader) and `context_budget` (stored, and explicitly a no-op until a model→context
+  registry exists).
+- **Not wired to production (this repo):** `src/execution-plans/` (P24) and `src/playbook-artifacts/`
+  have no caller outside this repo's tests and `scripts/sandbox/*`. Their guarantees —
+  `GATE_NOT_DISABLEABLE`, `effectReceipt`, fresh-evidence acceptance, `unknown` → reconcile — are
+  enforced by this repo's CI/tests, **not** by the running agent. `src/execution-plans/README.md`
+  says the same.
+- **Timeout reality:** the declared `execution_timeout_seconds` is resolved by the agent as
+  `min(max(declared, DURABLE_STEP_MIN_TIMEOUT_SEC), 40 min)`. `DURABLE_STEP_MIN_TIMEOUT_SEC`
+  defaults to 2400 s, so with default env **every step gets exactly 2400 s** regardless of the
+  declared number. A 5-minute engine-silence watchdog (`claude-runner.js`) fires earlier than any
+  of these when the engine produces no output.
+- **Requirements status** lives in GitHub issues (owner rule 2026-09-28); `docs/requirements-log.md`
+  is a historical record, not the current status.
 
 It is intentionally separate from product/runtime repositories such as `trained-assist-agent`, `trained-assist-web`, and future domain repositories.
 
@@ -805,7 +830,8 @@ Implemented today:
   comes from P23 (opt-in control record only, durable ACK with one decision), a simple
   schedule that stays without GTD, and a checklist that is a view over `planId`. A controlled
   artifact edit leaves the running plan on its pinned revision and never renames a running
-  step; see `docs/REAL-PLAYBOOKS-PLAN-ADAPTATION.md`;
+  step; see `docs/REAL-PLAYBOOKS-PLAN-ADAPTATION.md`. **Not wired into the production runtime**
+  — see "Where the policy is actually enforced" above;
 - Task Packet contract;
 - CLI surface;
 - MCP surface;
@@ -817,7 +843,7 @@ See `docs/WORKSPACE-LIFECYCLE.md` for the workspace contract (E1),
 `docs/DOMAIN-TOOLS-AND-PLAYBOOK-ARTIFACTS.md` for the domain capability/playbook-artifact
 contract (P14), `docs/MCP-INTEGRATION-SANDBOX.md` for the MCP integration sandbox contract
 (P15), `docs/REAL-PLAYBOOKS-PLAN-ADAPTATION.md` for the execution-plan contract (P24) and
-`docs/requirements-log.md` for the current requirements status.
+`docs/requirements-log.md` for the historical requirements record (current status is in issues).
 
 Current priority order:
 

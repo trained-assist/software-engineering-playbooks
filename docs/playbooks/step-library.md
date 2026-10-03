@@ -30,7 +30,7 @@ Typed step library for the engineering playbooks. One step type = one reusable u
 | `confirm-fixed` | Подтвердить, что ошибка ушла в проде | — | verifier · bachelor | `error_gone_in_production` | debugging |
 | `repo-bootstrap` | Каркас репозитория | — (Spec Kit: constitution) | developer · bachelor | `repo_bootstrapped_with_ci_and_docs` | new-software |
 | `go-live` | Из песочницы в реальное окружение | apply (deliver) | developer · master | `running_in_real_environment` | new-software |
-| `archive` | Архивация: обновить живые доки и закрыть план | archive (слить spec delta в живые спеки) | reviewer · bachelor | `living_docs_updated_and_plan_closed` | debugging, epic-delivery, feature, new-software, skill-tool |
+| `archive` | Архивация: доставить живые доки и закрыть план | archive (слить spec delta в живые спеки) | reviewer · bachelor | `living_docs_updated_and_plan_closed` | debugging, epic-delivery, feature, new-software, skill-tool |
 | `epic-preflight` | Предполётная проверка эпика и журнал итераций | — (мета-цикл над планом: подготовка) | developer · doctor | `epic_preflight_passed_and_ledger_written` | epic-delivery |
 | `next-card` | Следующая карточка плана | — (мета-цикл: выбор среза) | developer · doctor | `iteration_card_recorded_once_with_marker` | epic-delivery |
 | `child-plan` | Дочерний инженерный план карточки | — (мета-цикл: делегирование apply) | developer · master | `child_plan_of_this_iteration_terminal_or_deadline_and_outcome_recorded` | epic-delivery |
