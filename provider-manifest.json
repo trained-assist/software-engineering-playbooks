@@ -413,6 +413,34 @@
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_repo_status",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "repo"
+        ],
+        "properties": {
+          "repo": {
+            "type": "string"
+          },
+          "limits": {
+            "type": "object"
+          },
+          "refresh": {
+            "type": "boolean"
+          }
+        }
+      },
+      "allowedTriggers": [
+        "user",
+        "cron",
+        "system"
+      ],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
     }
   ],
   "contextFields": [],
