@@ -191,14 +191,42 @@ test('purpose override is marked derived when the definitions say so', async () 
   assert.equal(plain.repos[0].purpose.derived, false);
 });
 
+test('catalog request paths are pinned per scope (no affiliation+type 422)', () => {
+  const { listPath } = require('../src/repo-catalog');
+  assert.equal(
+    listPath('visible', 1),
+    '/user/repos?affiliation=owner,collaborator,organization_member&sort=full_name&per_page=100&page=1',
+  );
+  assert.equal(
+    listPath(undefined, 2),
+    '/user/repos?affiliation=owner,collaborator,organization_member&sort=full_name&per_page=100&page=2',
+  );
+  assert.equal(
+    listPath('org:trained-assist', 1),
+    '/orgs/trained-assist/repos?type=all&sort=full_name&per_page=100&page=1',
+  );
+  assert.equal(
+    listPath('user:kobzevvv', 1),
+    '/users/kobzevvv/repos?type=all&sort=full_name&per_page=100&page=1',
+  );
+  // GitHub 422: "If you specify visibility or affiliation, you cannot specify type."
+  for (const scope of ['visible', 'org:x', 'user:x']) {
+    const path = listPath(scope, 1);
+    const hasAffiliation = path.includes('affiliation=');
+    const hasType = path.includes('type=');
+    assert.ok(!(hasAffiliation && hasType), `${scope} must not combine affiliation and type: ${path}`);
+    assert.ok(path.includes('sort=full_name'), `${scope} must pin a stable order: ${path}`);
+  }
+});
+
 test('catalog requests a stable order so pagination is reproducible', async () => {
   const paths = [];
   const rec = async (p) => { paths.push(p); return FIXTURE; };
   await find({ query: 'hh-skill' }, { ghFetch: rec });
   assert.equal(paths.length, 1, 'one page for a short fixture list');
   assert.match(paths[0], /\/user\/repos\?/);
-  assert.match(paths[0], /type=all/);
   assert.match(paths[0], /sort=full_name/);
+  assert.ok(!paths[0].includes('type='), 'visible scope must not send type together with affiliation');
 
   paths.length = 0;
   const fullPage = Array.from({ length: 100 }, (_, i) => ({

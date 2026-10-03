@@ -61,9 +61,14 @@ function listPath(scope, page) {
   // sort=full_name everywhere: GitHub defaults differ per endpoint (created,
   // pushed, updated), and a catalog whose page 2 shifts between two calls is
   // not reproducible — pagination and freshness claims depend on stable order.
+  //
+  // /user/repos takes `affiliation` INSTEAD of `type`: GitHub answers
+  // 422 "If you specify visibility or affiliation, you cannot specify type."
+  // (found by a live prod call, #108 follow-up) — so the two must never be
+  // combined. Golden-path tests below pin the exact query per scope.
   const page_ = `&sort=full_name&per_page=${PER_PAGE}&page=${page}`;
   if (!scope || scope === 'visible') {
-    return `/user/repos?affiliation=owner,collaborator,organization_member&type=all${page_}`;
+    return `/user/repos?affiliation=owner,collaborator,organization_member${page_}`;
   }
   if (scope.startsWith('org:')) {
     const org = scope.slice(4).trim();
@@ -201,4 +206,4 @@ function clearCache() {
   CACHE.clear();
 }
 
-module.exports = { buildCatalog, clearCache, loadDefinitions, DEFAULT_TTL_MS };
+module.exports = { buildCatalog, clearCache, loadDefinitions, listPath, DEFAULT_TTL_MS };
