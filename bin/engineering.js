@@ -14,6 +14,7 @@ const { findRepos } = require('../src/repo-catalog');
 const { repoStatus } = require('../src/repo-status');
 const { changeFind, changeBind } = require('../src/change-find');
 const { changeStatus } = require('../src/change-status');
+const { verify } = require('../src/verify');
 
 function args(argv) {
   const out = { _: [] };
@@ -51,6 +52,11 @@ const USAGE = [
   '  change-status --change-ref <#115|branch eng/x|sha abc1234|URL> [--repo <owner/name>]',
   '                [--workspace-ref <ws-id|path>] [--requirements-ref <issue#112@3>]',
   '                [--principal <id>]',
+  '',
+  '  verify (--requirements <json-array> | --requirements-ref <issue#112|file:path>)',
+  '         --target <json-object> [--repo <owner/name>] [--scope implementation|delivery|user_scenario]',
+  '         [--evidence-refs <ref,ref>] [--run-checks] [--no-judge] [--max-checks <n>]',
+  '         [--principal <id>] [--root <store-root>]',
   '',
   '  workspace-spawn --root <dir> --source-checkout <git-repo> --base-revision <sha>',
   '                  --principal <id> --host <id> --repo-id <id> --root-task-id <id> --idempotency-key <key>',
@@ -250,6 +256,44 @@ async function main() {
       repo: typeof a.repo === 'string' ? a.repo : undefined,
       workspace_ref: typeof a['workspace-ref'] === 'string' ? a['workspace-ref'] : undefined,
       requirements_ref: typeof a['requirements-ref'] === 'string' ? a['requirements-ref'] : undefined,
+    }, {
+      principal: a.principal !== undefined && a.principal !== true ? a.principal : (process.env.USER_ID || ''),
+      workspaceRoot: typeof a.root === 'string' ? a.root : undefined,
+    }));
+  } else if (command === 'verify') {
+    function jsonArg(name) {
+      const v = a[name];
+      if (v === undefined || v === true) return undefined;
+      try {
+        return JSON.parse(v);
+      } catch (e) {
+        console.error(`verify: --${name} must be JSON (${e.message})`);
+        process.exit(2);
+      }
+    }
+    const target = jsonArg('target');
+    const requirements = jsonArg('requirements');
+    if (!target && !a['workspace-ref']) {
+      console.error('verify: pass --target <json-object> ({"pr":115} / {"commit":"abc"} / {"workspace_ref":"ws-…"})');
+      process.exit(2);
+    }
+    if (!requirements && !a['requirements-ref']) {
+      console.error('verify: pass --requirements <json-array> or --requirements-ref <issue#112[@rev]|file:path[@rev]>');
+      process.exit(2);
+    }
+    const budget = {};
+    if (a['no-judge'] === true) budget.judge = false;
+    if (typeof a['max-checks'] === 'string') budget.max_checks = Number(a['max-checks']);
+    print(await verify({
+      requirements,
+      requirements_ref: typeof a['requirements-ref'] === 'string' ? a['requirements-ref'] : undefined,
+      target,
+      workspace_ref: typeof a['workspace-ref'] === 'string' ? a['workspace-ref'] : undefined,
+      repo: typeof a.repo === 'string' ? a.repo : undefined,
+      scope: typeof a.scope === 'string' ? a.scope : undefined,
+      evidence_refs: typeof a['evidence-refs'] === 'string' ? a['evidence-refs'] : undefined,
+      run_checks: a['run-checks'] === true,
+      budget: Object.keys(budget).length ? budget : undefined,
     }, {
       principal: a.principal !== undefined && a.principal !== true ? a.principal : (process.env.USER_ID || ''),
       workspaceRoot: typeof a.root === 'string' ? a.root : undefined,
