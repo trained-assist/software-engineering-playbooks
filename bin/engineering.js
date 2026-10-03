@@ -11,6 +11,7 @@ const {
 } = require('../src/workspace');
 const { rolloutAutofix, resolveGithubCapability } = require('../src/pr-autofix');
 const { findRepos } = require('../src/repo-catalog');
+const { repoStatus } = require('../src/repo-status');
 
 function args(argv) {
   const out = { _: [] };
@@ -37,6 +38,8 @@ const USAGE = [
   '',
   '  repo-find --query <text> [--scope visible|org:<name>|user:<name>] [--limit 10]',
   '            [--cursor <n>] [--refresh] [--include-archived]',
+  '',
+  '  repo-status --repo <owner/name> [--prs 10] [--issues 10] [--refresh]',
   '',
   '  workspace-spawn --root <dir> --source-checkout <git-repo> --base-revision <sha>',
   '                  --principal <id> --host <id> --repo-id <id> --root-task-id <id> --idempotency-key <key>',
@@ -149,6 +152,19 @@ async function main() {
     });
     if (a.json) print(result);
     else printRollout(result);
+  } else if (command === 'repo-status') {
+    if (!a.repo || a.repo === true) {
+      console.error('repo-status: pass --repo <owner/name>');
+      process.exit(2);
+    }
+    const limits = {};
+    if (a.prs !== undefined && a.prs !== true) limits.prs = Number(a.prs);
+    if (a.issues !== undefined && a.issues !== true) limits.issues = Number(a.issues);
+    print(await repoStatus({
+      repo: a.repo,
+      limits: Object.keys(limits).length ? limits : undefined,
+      refresh: a.refresh === true,
+    }));
   } else if (command === 'repo-find') {
     if (!a.query || a.query === true) {
       console.error('repo-find: pass --query <text>');
