@@ -12,6 +12,7 @@ const {
 const { rolloutAutofix, resolveGithubCapability } = require('../src/pr-autofix');
 const { findRepos } = require('../src/repo-catalog');
 const { repoStatus } = require('../src/repo-status');
+const { changeFind, changeBind } = require('../src/change-find');
 
 function args(argv) {
   const out = { _: [] };
@@ -40,6 +41,12 @@ const USAGE = [
   '            [--cursor <n>] [--refresh] [--include-archived]',
   '',
   '  repo-status --repo <owner/name> [--prs 10] [--issues 10] [--refresh]',
+  '',
+  '  change-find --repo <owner/name> (--task-ref <text> | --query <text>)',
+  '              [--known-refs <ref,ref>] [--since <date>] [--until <date>] [--limit 10]',
+  '              [--principal <id>]',
+  '  change-bind --repo <owner/name> --task-ref <text> --refs <"PR #1, branch x">',
+  '              [--principal <id>]',
   '',
   '  workspace-spawn --root <dir> --source-checkout <git-repo> --base-revision <sha>',
   '                  --principal <id> --host <id> --repo-id <id> --root-task-id <id> --idempotency-key <key>',
@@ -72,6 +79,11 @@ function printRollout(result) {
     `\n${result.summary.pr_opened} PR(s) opened, ${result.summary.installed} already installed, `
     + `${result.summary.skipped} skipped (ref ${result.ref})\n`,
   );
+}
+
+function splitList(value) {
+  if (value === undefined || value === null || value === true || value === '') return [];
+  return String(value).split(',').map((s) => s.trim()).filter(Boolean);
 }
 
 function collectRepos(a) {
@@ -177,6 +189,52 @@ async function main() {
       cursor: a.cursor !== undefined && a.cursor !== true ? String(a.cursor) : undefined,
       refresh: a.refresh === true,
       include_archived: a['include-archived'] === true,
+    }));
+  } else if (command === 'change-find') {
+    if (!a.repo || a.repo === true) {
+      console.error('change-find: pass --repo <owner/name>');
+      process.exit(2);
+    }
+    if ((!a['task-ref'] || a['task-ref'] === true) && (!a.query || a.query === true)) {
+      console.error('change-find: pass --task-ref <text> or --query <text>');
+      process.exit(2);
+    }
+    const timeRange = {};
+    if (a.since && a.since !== true) timeRange.since = a.since;
+    if (a.until && a.until !== true) timeRange.until = a.until;
+    const knownRefs = splitList(a['known-refs']);
+    print(await changeFind({
+      repo: a.repo,
+      task_ref: typeof a['task-ref'] === 'string' ? a['task-ref'] : undefined,
+      query: typeof a.query === 'string' ? a.query : undefined,
+      known_refs: knownRefs.length ? knownRefs : undefined,
+      time_range: Object.keys(timeRange).length ? timeRange : undefined,
+      limit: a.limit !== undefined && a.limit !== true ? Number(a.limit) : undefined,
+    }, {
+      principal: a.principal !== undefined && a.principal !== true ? a.principal : (process.env.USER_ID || ''),
+      workspaceRoot: typeof a.root === 'string' ? a.root : undefined,
+    }));
+  } else if (command === 'change-bind') {
+    if (!a.repo || a.repo === true) {
+      console.error('change-bind: pass --repo <owner/name>');
+      process.exit(2);
+    }
+    if (!a['task-ref'] || a['task-ref'] === true) {
+      console.error('change-bind: pass --task-ref <text>');
+      process.exit(2);
+    }
+    const refs = splitList(a.refs);
+    if (!refs.length) {
+      console.error('change-bind: pass --refs <"PR #1, branch eng/x">');
+      process.exit(2);
+    }
+    print(await changeBind({
+      repo: a.repo,
+      task_ref: a['task-ref'],
+      refs,
+    }, {
+      principal: a.principal !== undefined && a.principal !== true ? a.principal : (process.env.USER_ID || ''),
+      workspaceRoot: typeof a.root === 'string' ? a.root : undefined,
     }));
   } else {
     console.error(USAGE);

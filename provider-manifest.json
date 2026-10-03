@@ -441,6 +441,75 @@
       "effect": "read",
       "requiresApproval": false,
       "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_change_find",
+      "inputSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "repo": {
+            "type": "string"
+          },
+          "task_ref": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "known_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "time_range": {
+            "type": "object"
+          },
+          "limit": {
+            "type": "number"
+          }
+        }
+      },
+      "allowedTriggers": [
+        "user",
+        "cron",
+        "system"
+      ],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_change_bind",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "repo",
+          "task_ref",
+          "refs"
+        ],
+        "properties": {
+          "repo": {
+            "type": "string"
+          },
+          "task_ref": {
+            "type": "string"
+          },
+          "refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "allowedTriggers": [
+        "user"
+      ],
+      "effect": "write",
+      "requiresApproval": false,
+      "retrySafety": "idempotent"
     }
   ],
   "contextFields": [],
