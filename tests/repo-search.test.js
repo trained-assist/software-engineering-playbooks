@@ -67,6 +67,23 @@ const FILES = {
     '',
   ].join('\n'),
   'README.md': ['# Fixture repository', ''].join('\n'),
+  // A symbol-less file (JSON) whose identifying token sits deep in the body:
+  // the index knows the file, but only a windowed chunker makes the token
+  // reachable instead of indexing just the head.
+  'config/registry.json': `${JSON.stringify(
+    { keys: Array.from({ length: 220 }, (_, i) => ({ key: `key_${String(i).padStart(3, '0')}`, value: i })).concat([{ key: 'deepMarkerIdentifier', value: 'here' }]) },
+    null,
+    2,
+  )}\n`,
+  // A single document section longer than one window (MAX_CHUNK_CHARS=2400):
+  // the token after the window boundary must be found by a continuation chunk.
+  'docs/long.md': [
+    '# Длинная секция',
+    '',
+    ...Array.from({ length: 80 }, (_, i) => `строка ${i} ${'y'.repeat(40)}`),
+    'tailMarkerToken находится после границы окна',
+    '',
+  ].join('\n'),
 };
 
 function makeRepo() {
@@ -117,6 +134,40 @@ test('natural-language question finds the document that talks about it', async (
 
   const paths = result.hits.map((h) => h.path);
   assert.ok(paths.includes('docs/parking.md'), `expected docs/parking.md among ${JSON.stringify(paths)}`);
+});
+
+test('an identifier deep inside a symbol-less file is indexed, not just the file head', async () => {
+  const repo = makeRepo();
+  const result = await search(repo, 'deepMarkerIdentifier');
+
+  const hit = result.hits.find((h) => h.path === 'config/registry.json');
+  assert.ok(hit, `the deep identifier must be reachable: ${JSON.stringify(result.hits.map((h) => h.path))}`);
+  assert.ok(hit.start_line > 120, `the hit must cite the deep line, got ${hit.start_line}`);
+  assert.equal(hit.source_ref, `${hit.commit_sha}:config/registry.json:${hit.start_line}-${hit.end_line}`);
+});
+
+test('a long document section is covered by continuation chunks, not only its head', async () => {
+  const repo = makeRepo();
+  const result = await search(repo, 'tailMarkerToken');
+
+  assert.ok(
+    result.hits.some((h) => h.path === 'docs/long.md'),
+    `the section tail must be found: ${JSON.stringify(result.hits.map((h) => h.path))}`,
+  );
+});
+
+test('include scopes the answer on a warm cache, not only a cold build', async () => {
+  const repo = makeRepo();
+  const root = mapsRoot();
+  await search(repo, 'park', { workspaces_root: root }); // warm the chunk cache first
+
+  const scoped = await search(repo, 'park', { workspaces_root: root, include: ['docs/'] });
+  assert.ok(scoped.hits.length > 0, 'docs/ must still contain the query');
+  assert.ok(
+    scoped.hits.every((h) => h.path.startsWith('docs/')),
+    `include must scope the answer: ${JSON.stringify(scoped.hits.map((h) => h.path))}`,
+  );
+  assert.ok(scoped.limitations.some((line) => line.includes('Scoped to include')));
 });
 
 test('without embedding credentials dense/hybrid degrade to keyword and say so', async () => {

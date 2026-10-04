@@ -56,41 +56,48 @@ function priorityOf(rel, kind) {
   return 2;
 }
 
-function codeChunks(rel, lines, symbols, stats) {
+// One chunk is one window. A unit longer than a window (a symbol-less file, a
+// long doc section, a symbol body) is covered by CONSECUTIVE windows, not just
+// its head — otherwise an identifier deep in a file is invisible to search even
+// though the index knows the file. Windows advance by the lines actually
+// consumed, so they tile the range with no gap.
+function windowChunks(rel, lines, from, to, makeMeta) {
+  const out = [];
+  let start = from;
+  while (start <= to) {
+    const body = sliceLines(lines, start, Math.min(MAX_CHUNK_LINES, to - start + 1));
+    if (!body.length) { start += 1; continue; }
+    out.push({
+      path: rel,
+      startLine: start,
+      endLine: start + body.length - 1,
+      ...makeMeta(out.length),
+      text: normalizeText(body),
+    });
+    start += body.length;
+  }
+  return out;
+}
+
+function codeChunks(rel, lines, symbols) {
   const starts = (symbols && symbols.length ? symbols : [])
     .filter((s) => Number.isInteger(s.line) && s.line >= 1 && s.line <= lines.length)
     .slice()
     .sort((a, b) => a.line - b.line);
   if (!starts.length) {
-    const body = sliceLines(lines, 1, MAX_CHUNK_LINES);
-    if (!body.length) return [];
-    return [{
-      path: rel,
-      startLine: 1,
-      endLine: body.length,
-      symbol: null,
-      kind: 'code-file',
-      text: normalizeText(body),
-    }];
+    // A symbol-less file (JSON, config, shell without a parser): cover the whole
+    // body, not only its first window.
+    return windowChunks(rel, lines, 1, lines.length, () => ({ symbol: null, kind: 'code-file' }));
   }
   const out = [];
   for (let i = 0; i < starts.length; i++) {
     const from = starts[i].line;
-    const to = i + 1 < starts.length ? starts[i + 1].line - 1 : Math.min(lines.length, from + MAX_CHUNK_LINES - 1);
-    const body = sliceLines(lines, from, Math.min(MAX_CHUNK_LINES, Math.max(1, to - from + 1)));
-    if (!body.length) continue;
-    out.push({
-      path: rel,
-      startLine: from,
-      endLine: from + body.length - 1,
+    const to = Math.max(from, i + 1 < starts.length ? starts[i + 1].line - 1 : lines.length);
+    out.push(...windowChunks(rel, lines, from, to, () => ({
       symbol: starts[i].name,
       symbolKind: starts[i].kind,
       kind: 'code-symbol',
-      text: normalizeText(body),
-    });
-  }
-  if (lines.length > MAX_CHUNK_LINES * 2 && starts.length) {
-    stats.tailSkippedFiles = (stats.tailSkippedFiles || 0) + 1;
+    })));
   }
   return out;
 }
@@ -102,22 +109,15 @@ function docChunks(rel, lines) {
     if (m) heads.push({ line: i + 1, title: m[1].trim(), level: (m[0].match(/^#+/) || [''])[0].length });
   }
   if (!heads.length) {
-    const body = sliceLines(lines, 1, MAX_CHUNK_LINES);
-    return body.length ? [{ path: rel, startLine: 1, endLine: body.length, symbol: null, kind: 'doc-file', text: normalizeText(body) }] : [];
+    return windowChunks(rel, lines, 1, lines.length, () => ({ symbol: null, kind: 'doc-file' }));
   }
   const out = [];
   for (let i = 0; i < heads.length; i++) {
-    const next = i + 1 < heads.length ? heads[i + 1].line - 1 : lines.length;
-    const body = sliceLines(lines, heads[i].line, Math.min(MAX_CHUNK_LINES, Math.max(1, next - heads[i].line + 1)));
-    if (!body.length) continue;
-    out.push({
-      path: rel,
-      startLine: heads[i].line,
-      endLine: heads[i].line + body.length - 1,
+    const next = Math.max(heads[i].line, i + 1 < heads.length ? heads[i + 1].line - 1 : lines.length);
+    out.push(...windowChunks(rel, lines, heads[i].line, next, () => ({
       symbol: heads[i].title,
       kind: 'doc-section',
-      text: normalizeText(body),
-    });
+    })));
   }
   return out;
 }
@@ -222,7 +222,7 @@ function buildChunks({ repoPath, workspacesRoot, maxChunks = DEFAULT_MAX_CHUNKS,
       if (body.length) push({ path: file.path, startLine: 1, endLine: body.length, symbol: null, kind: 'code-file', text: normalizeText(body) });
       continue;
     }
-    for (const chunk of codeChunks(file.path, lines, file.symbols, stats)) push(chunk);
+    for (const chunk of codeChunks(file.path, lines, file.symbols)) push(chunk);
   }
 
   const summaries = moduleSummaryChunks(found.index.modules, found.index.files);

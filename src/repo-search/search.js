@@ -171,20 +171,28 @@ async function repoSearch(input = {}) {
     return { chunk: entry.chunk, score: b.score, matchKind: b.matchKind, sources: entry.sources };
   }).sort((a, b) => b.score - a.score || a.chunk.path.localeCompare(b.chunk.path) || a.chunk.startLine - b.chunk.startLine);
 
+  // include is a path-prefix scope, and it must hold for the ANSWER too, not
+  // only for a cold chunk build: with a warm cache the chunks are already built
+  // unfiltered, so the scope is applied to the ranked candidates here.
+  const include = (input.include || []).map((p) => String(p)).filter(Boolean);
+  const scoped = include.length
+    ? boosted.filter((h) => include.some((prefix) => h.chunk.path.startsWith(prefix)))
+    : boosted;
+
   // Freshness is verified against the working tree, never assumed from the
   // index: the top candidate files are re-hashed, deleted/renamed files are
   // dropped and modified files are marked stale instead of being quoted as is.
-  const candidateFiles = [...new Set(boosted.slice(0, STALE_SCAN_LIMIT).map((h) => h.chunk.path))];
+  const candidateFiles = [...new Set(scoped.slice(0, STALE_SCAN_LIMIT).map((h) => h.chunk.path))];
   const workingHashes = fileHashMap(abs, candidateFiles);
   const dirty = git(abs, ['status', '--porcelain'], '') !== '';
   const dropped = [];
   const stale = [];
   const hits = [];
-  for (const hit of boosted) {
+  for (const hit of scoped) {
     const rel = hit.chunk.path;
     const live = fs.existsSync(path.join(abs, rel));
     if (!live) { dropped.push({ path: rel, reason: 'file-gone-from-working-tree' }); continue; }
-    if (!boosted.slice(0, STALE_SCAN_LIMIT).some((h) => h.chunk.path === rel)) continue;
+    if (!scoped.slice(0, STALE_SCAN_LIMIT).some((h) => h.chunk.path === rel)) continue;
     const now = workingHashes[rel];
     const changed = now && sha && hit.chunk.fileHash && hit.chunk.fileHash !== now;
     if (changed) {
@@ -216,6 +224,7 @@ async function repoSearch(input = {}) {
   ];
   if (dropped.length) limitations.push(`Dropped ${dropped.length} chunk(s) whose file no longer exists (deleted/renamed after the indexed revision).`);
   if (stale.length && !includeStale) limitations.push(`Excluded ${stale.length} hit(s) whose file changed after the indexed revision (pass include_stale to quote them).`);
+  if (include.length) limitations.push(`Scoped to include prefix(es): ${include.join(', ')} — sources outside them are not returned.`);
   if (buildStats && buildStats.truncated) limitations.push(`Chunk budget reached (${buildStats.chunks} chunks): deeper files are not searched.`);
   if (resolved.degraded) {
     limitations.push(`Requested strategy "${resolved.requested}" degraded to "${resolved.strategy}": ${resolved.degraded}. A cross-lingual question ("где …" against English identifiers) is exactly what the lexical ranker alone cannot answer — pass strategy=dense with a provider configured, or expect a miss.`);
