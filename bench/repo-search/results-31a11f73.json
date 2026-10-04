@@ -1,0 +1,2988 @@
+{
+  "bench": "engineering_repo_search",
+  "datasetSize": 34,
+  "repo": "/home/vova/users/trained-assist-product-owner/engineering-workspaces/trained-assist-product-owner/trained-assist-software-engineering-playbooks/ws-b1974a8658f43044/code/bench-repo/agent",
+  "revision": "31a11f731e4247660b5ab1f8adcb700ac8dbae17",
+  "createdAt": "2026-10-04T01:33:21.937Z",
+  "strategies": [
+    "keyword",
+    "dense",
+    "hybrid",
+    "auto",
+    "current"
+  ],
+  "summary": {
+    "keyword": {
+      "byClass": {
+        "exact": {
+          "n": 16,
+          "recall5": 1,
+          "mrr10": 1,
+          "empty5": 0
+        },
+        "ru_en": {
+          "n": 6,
+          "recall5": 0,
+          "mrr10": 0,
+          "empty5": 0
+        },
+        "behavior": {
+          "n": 6,
+          "recall5": 0,
+          "mrr10": 0.028,
+          "empty5": 0
+        },
+        "absent": {
+          "n": 6,
+          "recall5": null,
+          "mrr10": null,
+          "empty5": 0
+        }
+      },
+      "overallRecall5": 0.571,
+      "latencyMsMedian": 163.5,
+      "embeddingTokens": 0
+    },
+    "dense": {
+      "byClass": {
+        "exact": {
+          "n": 16,
+          "recall5": 1,
+          "mrr10": 1,
+          "empty5": 0
+        },
+        "ru_en": {
+          "n": 6,
+          "recall5": 0.833,
+          "mrr10": 0.472,
+          "empty5": 0
+        },
+        "behavior": {
+          "n": 6,
+          "recall5": 0.917,
+          "mrr10": 0.722,
+          "empty5": 0
+        },
+        "absent": {
+          "n": 6,
+          "recall5": null,
+          "mrr10": null,
+          "empty5": 0
+        }
+      },
+      "overallRecall5": 0.946,
+      "latencyMsMedian": 6536.5,
+      "embeddingTokens": 0
+    },
+    "hybrid": {
+      "byClass": {
+        "exact": {
+          "n": 16,
+          "recall5": 1,
+          "mrr10": 1,
+          "empty5": 0
+        },
+        "ru_en": {
+          "n": 6,
+          "recall5": 0,
+          "mrr10": 0.021,
+          "empty5": 0
+        },
+        "behavior": {
+          "n": 6,
+          "recall5": 0.5,
+          "mrr10": 0.196,
+          "empty5": 0
+        },
+        "absent": {
+          "n": 6,
+          "recall5": null,
+          "mrr10": null,
+          "empty5": 0
+        }
+      },
+      "overallRecall5": 0.679,
+      "latencyMsMedian": 6484.5,
+      "embeddingTokens": 0
+    },
+    "auto": {
+      "byClass": {
+        "exact": {
+          "n": 16,
+          "recall5": 1,
+          "mrr10": 1,
+          "empty5": 0
+        },
+        "ru_en": {
+          "n": 6,
+          "recall5": 0.333,
+          "mrr10": 0.167,
+          "empty5": 0
+        },
+        "behavior": {
+          "n": 6,
+          "recall5": 0,
+          "mrr10": 0.028,
+          "empty5": 0
+        },
+        "absent": {
+          "n": 6,
+          "recall5": null,
+          "mrr10": null,
+          "empty5": 0
+        }
+      },
+      "overallRecall5": 0.643,
+      "latencyMsMedian": 174.5,
+      "embeddingTokens": 0
+    },
+    "current": {
+      "byClass": {
+        "exact": {
+          "n": 16,
+          "recall5": 1,
+          "mrr10": 1,
+          "empty5": 0
+        },
+        "ru_en": {
+          "n": 6,
+          "recall5": 0,
+          "mrr10": 0,
+          "empty5": 0
+        },
+        "behavior": {
+          "n": 6,
+          "recall5": 0.333,
+          "mrr10": 0.2,
+          "empty5": 0
+        },
+        "absent": {
+          "n": 6,
+          "recall5": null,
+          "mrr10": null,
+          "empty5": 0
+        }
+      },
+      "overallRecall5": 0.643,
+      "latencyMsMedian": 92,
+      "embeddingTokens": 0
+    }
+  },
+  "rows": {
+    "keyword": [
+      {
+        "id": "exact-01",
+        "cls": "exact",
+        "ms": 285,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/atomic-json.js",
+          "src/bugs-collector.js",
+          "src/issue-fixer.js",
+          "src/runner/index.js",
+          "src/runner/index.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-02",
+        "cls": "exact",
+        "ms": 108,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/mcp-action-broker.js",
+          "src/mcp-action-broker.js",
+          "src/mcp-action-broker.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-03",
+        "cls": "exact",
+        "ms": 120,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/zerocreds-preflight.js",
+          "src/server.js",
+          "tests/unit/zerocreds-preflight.test.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-04",
+        "cls": "exact",
+        "ms": 108,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/request-dedup-lock.js",
+          "test/run-ingress.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-05",
+        "cls": "exact",
+        "ms": 94,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/public-links.js",
+          "src/public-links.js",
+          "src/runner/tg-stream.js",
+          "tests/unit/public-links.test.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-06",
+        "cls": "exact",
+        "ms": 105,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/domain-surface.js",
+          "src/domain-surface.js",
+          "tests/unit/domain-surface.test.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-07",
+        "cls": "exact",
+        "ms": 118,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/intake-gate.js",
+          "docs/requirements-log.md",
+          "src/server.js",
+          "test/intake-gate.test.cjs",
+          "test/intake-gate.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-08",
+        "cls": "exact",
+        "ms": 101,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/usage-store.js",
+          "src/runner/index.js",
+          "src/runner/intent-engine.js",
+          "src/usage-store.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-09",
+        "cls": "exact",
+        "ms": 118,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/durable-task-plan.js",
+          "docs/requirements-log.md",
+          "src/durable-task-plan.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-10",
+        "cls": "exact",
+        "ms": 98,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "tests/unit/gtd-controller.test.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-11",
+        "cls": "exact",
+        "ms": 93,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/answer-router.js",
+          "docs/ANSWER-ROUTER-MANUAL-LAUNCH.md",
+          "src/answer-router.js",
+          "test/answer-router.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-12",
+        "cls": "exact",
+        "ms": 157,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/tg-format.js",
+          "src/tg-format.js",
+          "src/tg-format.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-13",
+        "cls": "exact",
+        "ms": 101,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/model-health.js",
+          "src/model-health.js",
+          "src/model-health.js",
+          "test/model-health.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-14",
+        "cls": "exact",
+        "ms": 101,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/playbook-executor.js",
+          "src/durable-recovery.js",
+          "docs/audits/playbook-prod-readiness-2026-09-26.md",
+          "docs/requirements-log.md",
+          "docs/specs/engineering-playbook-master-plan.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-15",
+        "cls": "exact",
+        "ms": 159,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/session-store.js",
+          "CLAUDE.md",
+          "README.md",
+          "src/session-store.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-16",
+        "cls": "exact",
+        "ms": 124,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/projects.js",
+          "src/projects.js",
+          "src/projects.js",
+          "test/bugs-project.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-01",
+        "cls": "ru_en",
+        "ms": 242,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/user-scenarios/exhibition/01-exhibition-catalog-to-sales-site.md",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "src/runner/index.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-02",
+        "cls": "ru_en",
+        "ms": 214,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/requirements-log.md",
+          "systemd/assist-agent-notify-failure.service",
+          "src/hh-vacancy.js",
+          "src/mcp-skills/tools/04-cron.js",
+          "src/session-summary.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-03",
+        "cls": "ru_en",
+        "ms": 171,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/skill-spec-template.md",
+          "docs/rule-of-three-cache-research.md",
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "docs/specs/recruiter-skill-spec.md",
+          "docs/user-scenarios/README.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-04",
+        "cls": "ru_en",
+        "ms": 205,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "docs/user-scenarios/recruiter/01-full-end-to-end.md",
+          "docs/user-scenarios/recruiter/03-response-regen.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/CICD-REVIEW-2026-09-14.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-05",
+        "cls": "ru_en",
+        "ms": 187,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/reproject.js",
+          "docs/user-scenarios/exhibition/01-exhibition-catalog-to-sales-site.md",
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "src/hh-resume.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-06",
+        "cls": "ru_en",
+        "ms": 169,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/architecture/mcp-skill-source-runtime-wiring.md",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "docs/specs/recruiter-skill-spec.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-01",
+        "cls": "behavior",
+        "ms": 233,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/HERMES-INTEGRATION-CHECKLIST.md",
+          "src/mcp-skills/tools/94-outsource-project.js",
+          "docs/HERMES-INTEGRATION-CHECKLIST.md",
+          "src/answer-router.js",
+          "docs/user-scenarios/engineering/01-development-playbook.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-02",
+        "cls": "behavior",
+        "ms": 266,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/domain-skill-repo-test-rules.md",
+          "docs/FOLLOWUP-CONTROLLER.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "docs/skills-roadmap.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-03",
+        "cls": "behavior",
+        "ms": 213,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "agent-notes.md",
+          "docs/requirements-log.md",
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "docs/hh-pipeline-spec.md",
+          "src/runner/intent-engine.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-04",
+        "cls": "behavior",
+        "ms": 194,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "tests/unit/playbook-executor.test.js",
+          "docs/domain-skill-repo-test-rules.md",
+          "src/runner/index.js",
+          "src/mcp-skills/tools/06-reproject.js",
+          "docs/documents-skill-group-and-pdf-reading-reliability-spec.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-05",
+        "cls": "behavior",
+        "ms": 210,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/mcp-skills/tools/99-interview-analysis.js",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/requirements-log.md",
+          "src/mcp-skills/tools/62-business-analyst.js",
+          "docs/requirements-log.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-06",
+        "cls": "behavior",
+        "ms": 188,
+        "recall5": 0,
+        "mrr10": 0.16666666666666666,
+        "empty5": false,
+        "top": [
+          "docs/architecture/mcp-skill-source-runtime-wiring.md",
+          "docs/zerocreds-integration-spec.md",
+          "docs/zerocreds-integration-spec.md",
+          "src/mcp-skills/tools/50-gdrive.js",
+          "docs/PROJECTS-CONVERGENCE-PLAN.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-01",
+        "cls": "absent",
+        "ms": 194,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/specs/recruiter-skill-spec.md",
+          "docs/skill-spec-template.md",
+          "docs/skills-roadmap.md",
+          "docs/user-scenarios/recruiter/06-hh-reconnect.md",
+          "src/mcp-skills/tools/81-gc-discovery.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-02",
+        "cls": "absent",
+        "ms": 204,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/recruiter/01-full-end-to-end.md",
+          "docs/user-scenarios/recruiter/03-response-regen.md",
+          "src/hh-quick.js",
+          "src/mcp-skills/tools/94-outsource-project.js",
+          "docs/documents-skill-group-and-pdf-reading-reliability-spec.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-03",
+        "cls": "absent",
+        "ms": 170,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/specs/playbook-executor-p3b-design.md",
+          "src/mcp-skills/tools/06-reproject.js",
+          "docs/skills-roadmap.md",
+          "docs/hh-pipeline-spec.md",
+          "docs/specs/playbook-executor-p3b-design.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-04",
+        "cls": "absent",
+        "ms": 158,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "src/agent-system-prompt.txt",
+          "src/bugs-collector.js",
+          "docs/skills-roadmap.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "src/gtd-controller.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-05",
+        "cls": "absent",
+        "ms": 161,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/HERMES-INTEGRATION-CHECKLIST.md",
+          "docs/skill-spec-template.md",
+          "CLAUDE.md",
+          "README.md",
+          "src/profiles.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-06",
+        "cls": "absent",
+        "ms": 166,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/HERMES-INTEGRATION-CHECKLIST.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      }
+    ],
+    "dense": [
+      {
+        "id": "exact-01",
+        "cls": "exact",
+        "ms": 8687,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/atomic-json.js",
+          "src/ru-edge.js",
+          "src/server.js",
+          "src/handlers/hh.js",
+          "src/handlers/web.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-02",
+        "cls": "exact",
+        "ms": 8128,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/mcp-action-broker.js",
+          "src/development-playbook.js",
+          "src/action-executions.js",
+          "src/runner/tg-stream.js",
+          "src/core/conversation-ref.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-03",
+        "cls": "exact",
+        "ms": 7408,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/zerocreds-preflight.js",
+          "tests/unit/zerocreds-preflight.test.js",
+          "docs/zerocreds-integration-spec.md",
+          "docs/zerocreds-integration-spec.md",
+          "docs/zerocreds-integration-spec.md"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-04",
+        "cls": "exact",
+        "ms": 6328,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/request-dedup-lock.js",
+          "src/inn-pipeline/sources/egrul.js",
+          "src/hh-cold-search-lock.js",
+          "scripts/claude-token-refresh.js",
+          "src/tg-notice-dedupe.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-05",
+        "cls": "exact",
+        "ms": 6673,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/public-links.js",
+          "src/review-links.js",
+          "src/public-links.js",
+          "tests/unit/public-links.test.js",
+          "src/review-links.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-06",
+        "cls": "exact",
+        "ms": 6451,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/domain-surface.js",
+          "scripts/claude-token-refresh.js",
+          "tests/hh-proactive-page.test.js",
+          "src/domain-surface.js",
+          "src/domain-surface.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-07",
+        "cls": "exact",
+        "ms": 7111,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/intake-gate.js",
+          "tests/unit/effective-context.test.js",
+          "tests/unit/domain-surface.test.js",
+          "scripts/pr-coherence-check.mjs",
+          "test/intake-gate.test.cjs"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-08",
+        "cls": "exact",
+        "ms": 6353,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/usage-store.js",
+          "tests/fixtures/engineering-workspace-lib.js",
+          "src/sent-messages.js",
+          "src/usage-store.js",
+          "src/usage-store.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-09",
+        "cls": "exact",
+        "ms": 6404,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/durable-task-plan.js",
+          "tests/unit/playbook-validators-mode.test.js",
+          "src/development-playbook.js",
+          "src/durable-task-plan.js",
+          "src/mcp-skills/tools/87-expo-pipeline.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-10",
+        "cls": "exact",
+        "ms": 6671,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "src/opencode-ladder.js",
+          "src/issue-fixer.js",
+          "src/retry-policy.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-11",
+        "cls": "exact",
+        "ms": 6510,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/answer-router.js",
+          "src/candidate-report.js",
+          "src/answer-router.js",
+          "src/answer-router.js",
+          "src/answer-router.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-12",
+        "cls": "exact",
+        "ms": 6548,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/tg-format.js",
+          "test/core-admission.test.cjs",
+          "test/tg-format.test.mjs",
+          "src/tg-notice-dedupe.js",
+          "src/tg-format.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-13",
+        "cls": "exact",
+        "ms": 6529,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/model-health.js",
+          "src/model-health.js",
+          "src/model-health.js",
+          "src/model-health.js",
+          "src/inn-pipeline/sources/bfo.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-14",
+        "cls": "exact",
+        "ms": 6922,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/playbook-executor.js",
+          "src/durable-recovery.js",
+          "src/core/conversation-session-index.js",
+          "tests/unit/playbook-executor.test.js",
+          "src/action-executions.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-15",
+        "cls": "exact",
+        "ms": 6582,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/session-store.js",
+          "src/session-store.js",
+          "README.md",
+          "src/runner/index.js",
+          "src/runner/intent-engine.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "exact-16",
+        "cls": "exact",
+        "ms": 6281,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/projects.js",
+          "src/projects.js",
+          "src/core/conversation-ref.js",
+          "src/projects.js",
+          "src/persona.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "ru-01",
+        "cls": "ru_en",
+        "ms": 6419,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/runner/task-queue.js",
+          "src/runner/task-queue.js",
+          "src/runner/index.js",
+          "src/hh-cold-search-lock.js",
+          "src/runner/index.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "ru-02",
+        "cls": "ru_en",
+        "ms": 6585,
+        "recall5": 1,
+        "mrr10": 0.5,
+        "empty5": false,
+        "top": [
+          "test/tg-format.test.mjs",
+          "src/tg-format.js",
+          "src/tg-format.js",
+          "src/tg-format.js",
+          "src/runner/tg-stream.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "ru-03",
+        "cls": "ru_en",
+        "ms": 6536,
+        "recall5": 1,
+        "mrr10": 0.3333333333333333,
+        "empty5": false,
+        "top": [
+          "docs/skill-spec-template.md",
+          "docs/how-to-add-skill.md",
+          "src/user-tokens.js",
+          "src/mcp-skills/tools/10-nalog.js",
+          "src/user-tokens.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "ru-04",
+        "cls": "ru_en",
+        "ms": 6576,
+        "recall5": 1,
+        "mrr10": 0.5,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "src/project-match.js",
+          "src/projects.js",
+          "src/project-match.js",
+          "src/projects.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "ru-05",
+        "cls": "ru_en",
+        "ms": 6442,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/session-summary.js",
+          "src/project-summary.js",
+          "src/runner/intent-engine.js",
+          "src/reproject.js",
+          "src/session-summary.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "ru-06",
+        "cls": "ru_en",
+        "ms": 6537,
+        "recall5": 1,
+        "mrr10": 0.5,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/README.md",
+          "src/readiness.js",
+          "src/readiness.js",
+          "src/mcp-skills/tools/63-ci-cd.js",
+          "src/mcp-skills/tools/81-gc-discovery.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "behavior-01",
+        "cls": "behavior",
+        "ms": 6629,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/engine-crash-policy.js",
+          "src/engine-crash-policy.js",
+          "src/engine-crash-policy.js",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md",
+          "src/engine-crash-policy.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "behavior-02",
+        "cls": "behavior",
+        "ms": 7159,
+        "recall5": 0.5,
+        "mrr10": 0.3333333333333333,
+        "empty5": false,
+        "top": [
+          "src/engine-crash-policy.js",
+          "src/engine-crash-policy.js",
+          "src/failure-taxonomy.js",
+          "src/engine-crash-policy.js",
+          ".opencode/MODEL-LADDER.md"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "behavior-03",
+        "cls": "behavior",
+        "ms": 8849,
+        "recall5": 1,
+        "mrr10": 0.5,
+        "empty5": false,
+        "top": [
+          "README.md",
+          "src/chat-history.js",
+          "src/chat-history.js",
+          "src/mcp-skills/tools/01-session-history.js",
+          "CLAUDE.md"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "behavior-04",
+        "cls": "behavior",
+        "ms": 7548,
+        "recall5": 1,
+        "mrr10": 0.5,
+        "empty5": false,
+        "top": [
+          "README.md",
+          "src/data-paths.js",
+          "CLAUDE.md",
+          "README.md",
+          "src/data-paths.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "behavior-05",
+        "cls": "behavior",
+        "ms": 6516,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/durable-task-store.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "src/data-paths.js",
+          "src/durable-task-store.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "behavior-06",
+        "cls": "behavior",
+        "ms": 6341,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/intake-media-retention.js",
+          "src/intake-media-retention.js",
+          "src/intake-media-retention.js",
+          "test/intake-media-retention.test.cjs",
+          "src/intake-media-retention.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "absent-01",
+        "cls": "absent",
+        "ms": 6302,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "src/handlers/hh.js",
+          "docs/hh-pipeline-spec.md",
+          "src/hh-review-page-html.js",
+          "src/handlers/hh.js",
+          "docs/hh-pipeline-spec.md"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "absent-02",
+        "cls": "absent",
+        "ms": 6311,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "README.md",
+          "docs/server-ops-playbook.md",
+          "src/runner/index.js",
+          "docs/skills-roadmap.md",
+          "CLAUDE.md"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "absent-03",
+        "cls": "absent",
+        "ms": 6522,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/hh-pipeline-spec.md",
+          "config/model-routing.json",
+          "docs/hh-pipeline-spec.md",
+          "docs/hh-pipeline-spec.md",
+          "src/issue-fixer.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "absent-04",
+        "cls": "absent",
+        "ms": 6310,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "src/mcp-skills/tools/95-video-analysis.js",
+          "src/runner/index.js",
+          "src/mcp-skills/tools/95-video-analysis.js",
+          "docs/user-scenarios/README.md",
+          "src/handlers/hh.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "absent-05",
+        "cls": "absent",
+        "ms": 6253,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "README.md",
+          "CLAUDE.md",
+          "docs/skill-spec-template.md",
+          "docs/specs/recruiter-skill-spec.md",
+          "src/mcp-skills/tools/99-interview-analysis.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "absent-06",
+        "cls": "absent",
+        "ms": 7015,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "src/hh-proactive-search.js",
+          "src/hh-proactive-search.js",
+          "src/hh-proactive-search.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      }
+    ],
+    "hybrid": [
+      {
+        "id": "exact-01",
+        "cls": "exact",
+        "ms": 6323,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/atomic-json.js",
+          "src/bugs-collector.js",
+          "src/issue-fixer.js",
+          "src/runner/index.js",
+          "test/run-ingress.test.cjs"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-02",
+        "cls": "exact",
+        "ms": 6542,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/mcp-action-broker.js",
+          "src/mcp-action-broker.js",
+          "src/mcp-action-broker.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-03",
+        "cls": "exact",
+        "ms": 6340,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/zerocreds-preflight.js",
+          "src/server.js",
+          "tests/unit/zerocreds-preflight.test.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-04",
+        "cls": "exact",
+        "ms": 6181,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/request-dedup-lock.js",
+          "test/run-ingress.test.cjs"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-05",
+        "cls": "exact",
+        "ms": 6313,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/public-links.js",
+          "src/public-links.js",
+          "src/runner/tg-stream.js",
+          "tests/unit/public-links.test.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-06",
+        "cls": "exact",
+        "ms": 6355,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/domain-surface.js",
+          "src/domain-surface.js",
+          "tests/unit/domain-surface.test.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-07",
+        "cls": "exact",
+        "ms": 6255,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/intake-gate.js",
+          "docs/requirements-log.md",
+          "test/intake-gate.test.cjs",
+          "src/server.js",
+          "test/intake-gate.test.cjs"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-08",
+        "cls": "exact",
+        "ms": 6328,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/usage-store.js",
+          "src/runner/index.js",
+          "src/usage-store.js",
+          "src/runner/intent-engine.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-09",
+        "cls": "exact",
+        "ms": 6401,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/durable-task-plan.js",
+          "src/durable-task-plan.js",
+          "docs/requirements-log.md",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-10",
+        "cls": "exact",
+        "ms": 6483,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "tests/unit/gtd-controller.test.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-11",
+        "cls": "exact",
+        "ms": 6178,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/answer-router.js",
+          "docs/ANSWER-ROUTER-MANUAL-LAUNCH.md",
+          "src/answer-router.js",
+          "test/answer-router.test.cjs"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-12",
+        "cls": "exact",
+        "ms": 6128,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/tg-format.js",
+          "src/tg-format.js",
+          "src/tg-format.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-13",
+        "cls": "exact",
+        "ms": 6796,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/model-health.js",
+          "src/model-health.js",
+          "test/model-health.test.cjs",
+          "src/model-health.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-14",
+        "cls": "exact",
+        "ms": 6912,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/playbook-executor.js",
+          "src/durable-recovery.js",
+          "src/playbook-executor.js",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/audits/playbook-prod-readiness-2026-09-26.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-15",
+        "cls": "exact",
+        "ms": 6618,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/session-store.js",
+          "CLAUDE.md",
+          "README.md",
+          "src/session-store.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "exact-16",
+        "cls": "exact",
+        "ms": 6763,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/projects.js",
+          "src/projects.js",
+          "src/projects.js",
+          "test/bugs-project.test.cjs"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "ru-01",
+        "cls": "ru_en",
+        "ms": 6654,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/specs/playbook-executor-p3b-design.md",
+          "src/hh-cold-search-lock.js",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md",
+          "src/runner/index.js",
+          "docs/FOLLOWUP-CONTROLLER.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "ru-02",
+        "cls": "ru_en",
+        "ms": 6653,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/session-summary.js",
+          "specs/hh-telegram-formatter-spec.md",
+          "specs/hh-telegram-formatter-spec.md",
+          "test/fixtures/telegram-sender-baseline.json",
+          "systemd/assist-agent-notify-failure.service"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "ru-03",
+        "cls": "ru_en",
+        "ms": 6790,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/skill-spec-template.md",
+          "docs/specs/recruiter-skill-spec.md",
+          "docs/skills-roadmap.md",
+          "docs/skills-roadmap.md",
+          "docs/user-scenarios/README.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "ru-04",
+        "cls": "ru_en",
+        "ms": 6621,
+        "recall5": 0,
+        "mrr10": 0.125,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "src/mcp-skills/tools/94-outsource-project.js",
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "docs/domain-skill-repo-test-rules.md",
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "ru-05",
+        "cls": "ru_en",
+        "ms": 7160,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "README.md",
+          "CLAUDE.md",
+          "docs/user-scenarios/exhibition/01-exhibition-catalog-to-sales-site.md",
+          "src/reproject.js",
+          "agent-notes.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "ru-06",
+        "cls": "ru_en",
+        "ms": 8176,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/architecture/mcp-skill-source-runtime-wiring.md",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "src/runner/intent-engine.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "behavior-01",
+        "cls": "behavior",
+        "ms": 6990,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/HERMES-INTEGRATION-CHECKLIST.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "src/answer-router.js",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "behavior-02",
+        "cls": "behavior",
+        "ms": 6512,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/runner/intent-engine.js",
+          "docs/user-scenarios/exhibition/01-exhibition-catalog-to-sales-site.md",
+          "docs/FOLLOWUP-CONTROLLER.md",
+          "docs/requirements-log.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "behavior-03",
+        "cls": "behavior",
+        "ms": 6486,
+        "recall5": 1,
+        "mrr10": 0.2,
+        "empty5": false,
+        "top": [
+          "src/runner/intent-engine.js",
+          "agent-notes.md",
+          "docs/requirements-log.md",
+          "docs/hh-pipeline-spec.md",
+          "src/chat-history.js"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "behavior-04",
+        "cls": "behavior",
+        "ms": 6623,
+        "recall5": 0,
+        "mrr10": 0.14285714285714285,
+        "empty5": false,
+        "top": [
+          "tests/unit/playbook-executor.test.js",
+          "src/mcp-skills/tools/06-reproject.js",
+          "src/runner/index.js",
+          "docs/skill-spec-template.md",
+          "docs/zerocreds-integration-spec.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "behavior-05",
+        "cls": "behavior",
+        "ms": 6791,
+        "recall5": 1,
+        "mrr10": 0.5,
+        "empty5": false,
+        "top": [
+          "docs/FOLLOWUP-CONTROLLER.md",
+          "src/durable-task-store.js",
+          "docs/requirements-log.md",
+          "src/mcp-skills/tools/101-durable-tasks.js",
+          "docs/requirements-log.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "behavior-06",
+        "cls": "behavior",
+        "ms": 6375,
+        "recall5": 1,
+        "mrr10": 0.3333333333333333,
+        "empty5": false,
+        "top": [
+          "src/opencode-go-keys.js",
+          "src/tg-notice-dedupe.js",
+          "src/intake-media-retention.js",
+          "docs/credential-store-migration.md",
+          "docs/credential-store-migration.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "absent-01",
+        "cls": "absent",
+        "ms": 6508,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/specs/recruiter-skill-spec.md",
+          "docs/skill-spec-template.md",
+          "src/mcp-skills/tools/81-gc-discovery.js",
+          "docs/hh-pipeline-spec.md",
+          "docs/user-scenarios/recruiter/06-hh-reconnect.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "absent-02",
+        "cls": "absent",
+        "ms": 6318,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/recruiter/01-full-end-to-end.md",
+          "src/hh-quick.js",
+          "src/mcp-skills/tools/94-outsource-project.js",
+          "docs/hh-pipeline-spec.md",
+          "docs/user-scenarios/recruiter/03-response-regen.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "absent-03",
+        "cls": "absent",
+        "ms": 6482,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/hh-pipeline-spec.md",
+          "docs/skills-roadmap.md",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/requirements-log.md",
+          "docs/rule-of-three-cache-research.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "absent-04",
+        "cls": "absent",
+        "ms": 6348,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "src/agent-system-prompt.txt",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/specs/domain-module-actions-cron-web-surface-v2.md",
+          "src/gtd-controller.js",
+          "docs/skills-roadmap.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "absent-05",
+        "cls": "absent",
+        "ms": 6265,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/skill-spec-template.md",
+          "docs/HERMES-INTEGRATION-CHECKLIST.md",
+          "src/profiles.js",
+          "src/mcp-skills/tools/84-artifacts.js",
+          "docs/specs/flexi-sales-skill-spec.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      },
+      {
+        "id": "absent-06",
+        "cls": "absent",
+        "ms": 6316,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/HERMES-INTEGRATION-CHECKLIST.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "agent-notes.md"
+        ],
+        "strategy": "hybrid",
+        "degraded": null
+      }
+    ],
+    "auto": [
+      {
+        "id": "exact-01",
+        "cls": "exact",
+        "ms": 146,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/atomic-json.js",
+          "src/bugs-collector.js",
+          "src/issue-fixer.js",
+          "src/runner/index.js",
+          "src/runner/index.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-02",
+        "cls": "exact",
+        "ms": 127,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/mcp-action-broker.js",
+          "src/mcp-action-broker.js",
+          "src/mcp-action-broker.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-03",
+        "cls": "exact",
+        "ms": 117,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/zerocreds-preflight.js",
+          "src/server.js",
+          "tests/unit/zerocreds-preflight.test.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-04",
+        "cls": "exact",
+        "ms": 112,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/request-dedup-lock.js",
+          "test/run-ingress.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-05",
+        "cls": "exact",
+        "ms": 115,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/public-links.js",
+          "src/public-links.js",
+          "src/runner/tg-stream.js",
+          "tests/unit/public-links.test.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-06",
+        "cls": "exact",
+        "ms": 127,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/domain-surface.js",
+          "src/domain-surface.js",
+          "tests/unit/domain-surface.test.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-07",
+        "cls": "exact",
+        "ms": 115,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/intake-gate.js",
+          "docs/requirements-log.md",
+          "src/server.js",
+          "test/intake-gate.test.cjs",
+          "test/intake-gate.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-08",
+        "cls": "exact",
+        "ms": 135,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/usage-store.js",
+          "src/runner/index.js",
+          "src/runner/intent-engine.js",
+          "src/usage-store.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-09",
+        "cls": "exact",
+        "ms": 117,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/durable-task-plan.js",
+          "docs/requirements-log.md",
+          "src/durable-task-plan.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-10",
+        "cls": "exact",
+        "ms": 129,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "tests/unit/gtd-controller.test.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-11",
+        "cls": "exact",
+        "ms": 110,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/answer-router.js",
+          "docs/ANSWER-ROUTER-MANUAL-LAUNCH.md",
+          "src/answer-router.js",
+          "test/answer-router.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-12",
+        "cls": "exact",
+        "ms": 116,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/tg-format.js",
+          "src/tg-format.js",
+          "src/tg-format.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-13",
+        "cls": "exact",
+        "ms": 134,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/model-health.js",
+          "src/model-health.js",
+          "src/model-health.js",
+          "test/model-health.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-14",
+        "cls": "exact",
+        "ms": 129,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/playbook-executor.js",
+          "src/durable-recovery.js",
+          "docs/audits/playbook-prod-readiness-2026-09-26.md",
+          "docs/requirements-log.md",
+          "docs/specs/engineering-playbook-master-plan.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-15",
+        "cls": "exact",
+        "ms": 135,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/session-store.js",
+          "CLAUDE.md",
+          "README.md",
+          "src/session-store.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "exact-16",
+        "cls": "exact",
+        "ms": 119,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/projects.js",
+          "src/projects.js",
+          "src/projects.js",
+          "test/bugs-project.test.cjs"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-01",
+        "cls": "ru_en",
+        "ms": 221,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/user-scenarios/exhibition/01-exhibition-catalog-to-sales-site.md",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "src/runner/index.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-02",
+        "cls": "ru_en",
+        "ms": 204,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/requirements-log.md",
+          "systemd/assist-agent-notify-failure.service",
+          "src/hh-vacancy.js",
+          "src/mcp-skills/tools/04-cron.js",
+          "src/session-summary.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-03",
+        "cls": "ru_en",
+        "ms": 407,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/skill-spec-template.md",
+          "docs/rule-of-three-cache-research.md",
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "docs/specs/recruiter-skill-spec.md",
+          "docs/user-scenarios/README.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-04",
+        "cls": "ru_en",
+        "ms": 6252,
+        "recall5": 1,
+        "mrr10": 0.5,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "src/project-match.js",
+          "src/projects.js",
+          "src/project-match.js",
+          "src/projects.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "ru-05",
+        "cls": "ru_en",
+        "ms": 198,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/reproject.js",
+          "docs/user-scenarios/exhibition/01-exhibition-catalog-to-sales-site.md",
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "src/hh-resume.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "ru-06",
+        "cls": "ru_en",
+        "ms": 6704,
+        "recall5": 1,
+        "mrr10": 0.5,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/README.md",
+          "src/readiness.js",
+          "src/readiness.js",
+          "src/mcp-skills/tools/63-ci-cd.js",
+          "src/mcp-skills/tools/81-gc-discovery.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "behavior-01",
+        "cls": "behavior",
+        "ms": 250,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/HERMES-INTEGRATION-CHECKLIST.md",
+          "src/mcp-skills/tools/94-outsource-project.js",
+          "docs/HERMES-INTEGRATION-CHECKLIST.md",
+          "src/answer-router.js",
+          "docs/user-scenarios/engineering/01-development-playbook.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-02",
+        "cls": "behavior",
+        "ms": 198,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "docs/domain-skill-repo-test-rules.md",
+          "docs/FOLLOWUP-CONTROLLER.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "docs/user-scenarios/engineering/01-development-playbook.md",
+          "docs/skills-roadmap.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-03",
+        "cls": "behavior",
+        "ms": 174,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "agent-notes.md",
+          "docs/requirements-log.md",
+          "docs/user-scenarios/freelance/01-freelance-project-spec.md",
+          "docs/hh-pipeline-spec.md",
+          "src/runner/intent-engine.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-04",
+        "cls": "behavior",
+        "ms": 196,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "tests/unit/playbook-executor.test.js",
+          "docs/domain-skill-repo-test-rules.md",
+          "src/runner/index.js",
+          "src/mcp-skills/tools/06-reproject.js",
+          "docs/documents-skill-group-and-pdf-reading-reliability-spec.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-05",
+        "cls": "behavior",
+        "ms": 209,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/mcp-skills/tools/99-interview-analysis.js",
+          "docs/specs/playbook-executor-p3b-design.md",
+          "docs/requirements-log.md",
+          "src/mcp-skills/tools/62-business-analyst.js",
+          "docs/requirements-log.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "behavior-06",
+        "cls": "behavior",
+        "ms": 212,
+        "recall5": 0,
+        "mrr10": 0.16666666666666666,
+        "empty5": false,
+        "top": [
+          "docs/architecture/mcp-skill-source-runtime-wiring.md",
+          "docs/zerocreds-integration-spec.md",
+          "docs/zerocreds-integration-spec.md",
+          "src/mcp-skills/tools/50-gdrive.js",
+          "docs/PROJECTS-CONVERGENCE-PLAN.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-01",
+        "cls": "absent",
+        "ms": 175,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/specs/recruiter-skill-spec.md",
+          "docs/skill-spec-template.md",
+          "docs/skills-roadmap.md",
+          "docs/user-scenarios/recruiter/06-hh-reconnect.md",
+          "src/mcp-skills/tools/81-gc-discovery.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-02",
+        "cls": "absent",
+        "ms": 6357,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "README.md",
+          "docs/server-ops-playbook.md",
+          "src/runner/index.js",
+          "docs/skills-roadmap.md",
+          "CLAUDE.md"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "absent-03",
+        "cls": "absent",
+        "ms": 217,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/specs/playbook-executor-p3b-design.md",
+          "src/mcp-skills/tools/06-reproject.js",
+          "docs/skills-roadmap.md",
+          "docs/hh-pipeline-spec.md",
+          "docs/specs/playbook-executor-p3b-design.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-04",
+        "cls": "absent",
+        "ms": 184,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "src/agent-system-prompt.txt",
+          "src/bugs-collector.js",
+          "docs/skills-roadmap.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "src/gtd-controller.js"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      },
+      {
+        "id": "absent-05",
+        "cls": "absent",
+        "ms": 6503,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "README.md",
+          "CLAUDE.md",
+          "docs/skill-spec-template.md",
+          "docs/specs/recruiter-skill-spec.md",
+          "src/mcp-skills/tools/99-interview-analysis.js"
+        ],
+        "strategy": "dense",
+        "degraded": null
+      },
+      {
+        "id": "absent-06",
+        "cls": "absent",
+        "ms": 244,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/narrow-wide-bot-architecture-spec.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/user-scenarios/recruiter/04-cold-search.md",
+          "docs/HERMES-INTEGRATION-CHECKLIST.md"
+        ],
+        "strategy": "keyword",
+        "degraded": null
+      }
+    ],
+    "current": [
+      {
+        "id": "exact-01",
+        "cls": "exact",
+        "ms": 107,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/atomic-json.js",
+          "src/atomic-json.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-02",
+        "cls": "exact",
+        "ms": 94,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/mcp-action-broker.js",
+          "src/mcp-action-broker.js",
+          "src/mcp-action-broker.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-03",
+        "cls": "exact",
+        "ms": 90,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/zerocreds-preflight.js",
+          "src/zerocreds-preflight.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-04",
+        "cls": "exact",
+        "ms": 92,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/request-dedup-lock.js",
+          "src/request-dedup-lock.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-05",
+        "cls": "exact",
+        "ms": 93,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/public-links.js",
+          "src/public-links.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-06",
+        "cls": "exact",
+        "ms": 93,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/domain-surface.js",
+          "src/domain-surface.js",
+          "src/domain-surface.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-07",
+        "cls": "exact",
+        "ms": 95,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/intake-gate.js",
+          "src/intake-gate.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-08",
+        "cls": "exact",
+        "ms": 96,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/usage-store.js",
+          "src/usage-store.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-09",
+        "cls": "exact",
+        "ms": 81,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/durable-task-plan.js",
+          "src/durable-task-plan.js",
+          "src/durable-task-plan.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-10",
+        "cls": "exact",
+        "ms": 94,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-11",
+        "cls": "exact",
+        "ms": 88,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/answer-router.js",
+          "src/answer-router.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-12",
+        "cls": "exact",
+        "ms": 89,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/tg-format.js",
+          "src/tg-format.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-13",
+        "cls": "exact",
+        "ms": 86,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/model-health.js",
+          "src/model-health.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-14",
+        "cls": "exact",
+        "ms": 96,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/playbook-executor.js",
+          "src/playbook-executor.js",
+          "src/playbook-executor.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-15",
+        "cls": "exact",
+        "ms": 93,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/session-store.js",
+          "src/session-store.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "exact-16",
+        "cls": "exact",
+        "ms": 88,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/projects.js",
+          "src/projects.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "ru-01",
+        "cls": "ru_en",
+        "ms": 89,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "ru-02",
+        "cls": "ru_en",
+        "ms": 93,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/mainstream-tester/fake-telegram.js",
+          "tests/helpers/mock-telegram.js",
+          "specs/hh-telegram-formatter-spec.md",
+          "test/fixtures/telegram-sender-baseline.json",
+          "test/ratchet-telegram-senders.test.cjs"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "ru-03",
+        "cls": "ru_en",
+        "ms": 89,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "ru-04",
+        "cls": "ru_en",
+        "ms": 87,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "ru-05",
+        "cls": "ru_en",
+        "ms": 92,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "ru-06",
+        "cls": "ru_en",
+        "ms": 96,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "behavior-01",
+        "cls": "behavior",
+        "ms": 99,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "behavior-02",
+        "cls": "behavior",
+        "ms": 98,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          "src/runner/intent-engine.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "behavior-03",
+        "cls": "behavior",
+        "ms": 105,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "behavior-04",
+        "cls": "behavior",
+        "ms": 85,
+        "recall5": 1,
+        "mrr10": 1,
+        "empty5": false,
+        "top": [
+          "src/data-paths.js",
+          "src/user-sites.js",
+          "scripts/sandbox-profile.cjs",
+          "src/bugs-collector.js",
+          "src/failure-classifier.js"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "behavior-05",
+        "cls": "behavior",
+        "ms": 90,
+        "recall5": 0,
+        "mrr10": 0,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "behavior-06",
+        "cls": "behavior",
+        "ms": 108,
+        "recall5": 1,
+        "mrr10": 0.2,
+        "empty5": false,
+        "top": [
+          "src/opencode-go-keys.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "src/gtd-controller.js",
+          "src/intake-media-retention.js"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "absent-01",
+        "cls": "absent",
+        "ms": 91,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "absent-02",
+        "cls": "absent",
+        "ms": 93,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "absent-03",
+        "cls": "absent",
+        "ms": 83,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "src/runner/intent-engine.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "absent-04",
+        "cls": "absent",
+        "ms": 92,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "absent-05",
+        "cls": "absent",
+        "ms": 90,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md",
+          "docs/architecture/mcp-skill-source-runtime-wiring.md"
+        ],
+        "degraded": null
+      },
+      {
+        "id": "absent-06",
+        "cls": "absent",
+        "ms": 83,
+        "recall5": null,
+        "mrr10": null,
+        "empty5": false,
+        "top": [
+          "src/runner/intent-engine.js",
+          ".opencode/README.md",
+          "docs/architecture/action-cron-contract-v1.md",
+          "docs/architecture/channel-execution-concurrency.md",
+          "docs/architecture/mcp-sibling-testing.md"
+        ],
+        "degraded": null
+      }
+    ]
+  }
+}

@@ -8,3 +8,5 @@ coverage/
 
 # P15 scratch (локальная отладка, не в коммитах)
 _scratch/
+bench-repo/
+.bench-openrouter-key
