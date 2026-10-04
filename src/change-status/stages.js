@@ -281,10 +281,18 @@ function verifiedStage(facts, observedAt, deliveredRevision) {
       { observed_at: observedAt, revision: recordCommit, refs, evidence: [{ source: 'verification-record', detail: rec.verified_at ? `verified_at=${rec.verified_at}` : 'verified_at неизвестен' }] });
   }
 
+  // A record exists, but engineering_verify said the requirements are NOT met
+  // (partial / not_met / inconclusive). That is the opposite of «verified» —
+  // the stage must not read it as satisfied (#113: per-REQ traceability, a
+  // single record never collapses into an optimistic word).
+  if (rec.verdict && rec.verdict !== 'pass') {
+    return stage('verified', 'not_satisfied',
+      `запись верификации есть, но её вердикт — ${rec.verdict}: проверенность не подтверждена`,
+      { observed_at: observedAt, revision: recordCommit, refs, evidence: [{ source: 'verification-record', detail: `verdict=${rec.verdict}${rec.verified_at ? `, verified_at=${rec.verified_at}` : ''}` }] });
+  }
+
   return stage('verified', 'satisfied',
-    rec.verdict && rec.verdict !== 'pass'
-      ? `запись верификации есть, но её вердикт — ${rec.verdict}`
-      : 'есть запись верификации, привязанная к этой ревизии и к этим требованиям',
+    'есть запись верификации, привязанная к этой ревизии и к этим требованиям',
     { observed_at: observedAt, revision: recordCommit, refs, evidence: [{ source: 'verification-record', detail: rec.verified_at ? `verified_at=${rec.verified_at}` : '' }] });
 }
 
