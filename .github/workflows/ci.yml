@@ -20,6 +20,8 @@ jobs:
         run: npm test
       - name: Provider manifest contract
         run: npm run manifest:check
+      - name: Core action manifest freshness (what trained-assist-agent registers)
+        run: npm run check:action-manifest
       - name: Build freshness
         run: npm run check:playbooks
 

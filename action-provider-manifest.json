@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 1,
   "providerId": "engineering",
   "actions": [
     {
@@ -653,7 +653,5 @@
       "requiresApproval": false,
       "retrySafety": "read_only"
     }
-  ],
-  "contextFields": [],
-  "connections": []
+  ]
 }
