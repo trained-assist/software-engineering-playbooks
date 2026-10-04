@@ -22,6 +22,8 @@ jobs:
         run: npm run manifest:check
       - name: Core action manifest freshness (what trained-assist-agent registers)
         run: npm run check:action-manifest
+      - name: Validation-key reachability (REPORT ONLY — owner decision 2026-10-03)
+        run: npm run report:validation-keys
       - name: Build freshness
         run: npm run check:playbooks
 
