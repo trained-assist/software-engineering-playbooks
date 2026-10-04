@@ -2,12 +2,12 @@
 
 > Сгенерировано `scripts/build-playbooks.js` из `playbooks-src/*.json` и `library/step-types.json`.
 > Прави источники и генератор, не этот файл: `npm run build:playbooks`, свежесть держит `npm run check:playbooks` (гейт CI).
-> Сверка с черновиком владельца «Software Engineering Playbooks» (2026-09-27). Версии источников: ci-run v1 · ci-setup v2 · debugging v2 · epic-delivery v3 · feature v2 · new-software v2 · skill-tool v2.
+> Сверка с черновиком владельца «Software Engineering Playbooks» (2026-09-27). Версии источников: ci-run v1 · ci-setup v2 · debugging v3 · epic-delivery v3 · feature v3 · new-software v3 · skill-tool v3.
 
 ## Коротко
 
-- **7 плейбуков**, 73 шага: `ci-run` (1), `ci-setup` (5), `debugging` (13), `epic-delivery` (8), `feature` (15), `new-software` (16), `skill-tool` (15) — на библиотеке из 32 типов шагов. У каждого типа есть роль, уровень модели, бюджет контекста, чек-лист под-шагов и критерий готовности.
-- Распределение: bachelor 35, master 27, doctor 6, программных шагов 5.
+- **7 плейбуков**, 77 шагов: `ci-run` (1), `ci-setup` (5), `debugging` (14), `epic-delivery` (8), `feature` (16), `new-software` (17), `skill-tool` (16) — на библиотеке из 33 типов шагов. У каждого типа есть роль, уровень модели, бюджет контекста, чек-лист под-шагов и критерий готовности.
+- Распределение: bachelor 35, master 31, doctor 6, программных шагов 5.
 - Уровни → движок (`trained-assist-agent/src/playbook-executor.js`, `DEFAULT_LEVEL_MAP`): bachelor и master → opencode, профиль `deepseek` (фолбэк — free-лестница, без Claude/Codex); doctor → Claude, при недоступности Codex → opencode `doctor`.
 
 ## Сводка по плейбукам
@@ -16,11 +16,11 @@
 |---|---|---|---|---|---|---|
 | `ci-run` | Прогон тестов ветки в облаке | 1 | 1 | 0 | 0 | 0 |
 | `ci-setup` | Настройка ручного прогона тестов в репозитории | 5 | 2 | 2 | 0 | 1 |
-| `debugging` | Отладка: баг, регрессия, ошибка в логах | 13 | 8 | 4 | 0 | 1 |
+| `debugging` | Отладка: баг, регрессия, ошибка в логах | 14 | 8 | 5 | 0 | 1 |
 | `epic-delivery` | Довести эпик/план архитектуры до конца (мета-цикл) | 8 | 1 | 2 | 5 | 0 |
-| `feature` | Фича или изменение в существующем продукте | 15 | 8 | 6 | 0 | 1 |
-| `new-software` | Новый софт или модуль с нуля (Playbook Zero) | 16 | 8 | 6 | 1 | 1 |
-| `skill-tool` | Новый MCP-инструмент в доменном скиле | 15 | 7 | 7 | 0 | 1 |
+| `feature` | Фича или изменение в существующем продукте | 16 | 8 | 7 | 0 | 1 |
+| `new-software` | Новый софт или модуль с нуля (Playbook Zero) | 17 | 8 | 7 | 1 | 1 |
+| `skill-tool` | Новый MCP-инструмент в доменном скиле | 16 | 7 | 8 | 0 | 1 |
 
 ## Шаги
 
@@ -40,7 +40,7 @@
 | 4 | PR: открыть, довести до зелёного, слить | PR смержен | `merged` | код (без LLM) | — | — | — | `merged` | опрос каждые 5 мин, до 24 ч |
 | 5 | Проверка и объяснение простыми словами | Проверка сценария в реальном окружении | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
 
-### `debugging` — Отладка: баг, регрессия, ошибка в логах (13 шагов)
+### `debugging` — Отладка: баг, регрессия, ошибка в логах (14 шагов)
 
 | # | Этап | Шаг | Тип | Кто | Уровень → модель сейчас | Контекст | Таймаут | Готово, когда | Ожидание / уведомление |
 |---|---|---|---|---|---|---|---|---|---|
@@ -56,7 +56,8 @@
 | 10 | Доставка и подтверждение | PR смержен | `merged` | код (без LLM) | — | — | — | `merged` | опрос каждые 5 мин, до 24 ч |
 | 11 | Доставка и подтверждение | Деплой прошёл и живой | `deployed` | проверяющий | bachelor → Go deepseek | small | 15 мин | `deployed_version_is_live` |  |
 | 12 | Доставка и подтверждение | Подтвердить, что ошибка ушла в проде | `confirm-fixed` | проверяющий | bachelor → Go deepseek | small | 15 мин | `error_gone_in_production` |  |
-| 13 | Архивация и разбор | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 13 | Доставка и подтверждение | Приёмка по принятым требованиям (независимый судья) | `verify-requirements` | проверяющий | master → Go deepseek | medium | 20 мин | `requirements_verified_by_independent_judge` |  |
+| 14 | Архивация и разбор | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
 ### `epic-delivery` — Довести эпик/план архитектуры до конца (мета-цикл) (8 шагов)
 
@@ -71,7 +72,7 @@
 | 7 | Финальная приёмка | Финальная приёмка по чек-листу | `final-acceptance` | проверяющий | doctor → Claude → Codex → opencode doctor | large | 40 мин | `acceptance_checklist_run_and_report_published_or_continuation_added` | уведомить владельца |
 | 8 | Архивация | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
-### `feature` — Фича или изменение в существующем продукте (15 шагов)
+### `feature` — Фича или изменение в существующем продукте (16 шагов)
 
 | # | Этап | Шаг | Тип | Кто | Уровень → модель сейчас | Контекст | Таймаут | Готово, когда | Ожидание / уведомление |
 |---|---|---|---|---|---|---|---|---|---|
@@ -88,10 +89,11 @@
 | 11 | Доставка и проверка в реальности | PR смержен | `merged` | код (без LLM) | — | — | — | `merged` | опрос каждые 5 мин, до 24 ч |
 | 12 | Доставка и проверка в реальности | Деплой прошёл и живой | `deployed` | проверяющий | bachelor → Go deepseek | small | 15 мин | `deployed_version_is_live` |  |
 | 13 | Доставка и проверка в реальности | Проверка сценария в реальном окружении | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
-| 14 | Доставка и проверка в реальности | Наблюдение после релиза (если нужно) | `observe` | проверяющий | bachelor → Go deepseek | small | 15 мин | `post_release_observation_done_or_not_needed` |  |
-| 15 | Архивация | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 14 | Доставка и проверка в реальности | Приёмка по принятым требованиям (независимый судья) | `verify-requirements` | проверяющий | master → Go deepseek | medium | 20 мин | `requirements_verified_by_independent_judge` |  |
+| 15 | Доставка и проверка в реальности | Наблюдение после релиза (если нужно) | `observe` | проверяющий | bachelor → Go deepseek | small | 15 мин | `post_release_observation_done_or_not_needed` |  |
+| 16 | Архивация | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
-### `new-software` — Новый софт или модуль с нуля (Playbook Zero) (16 шагов)
+### `new-software` — Новый софт или модуль с нуля (Playbook Zero) (17 шагов)
 
 | # | Этап | Шаг | Тип | Кто | Уровень → модель сейчас | Контекст | Таймаут | Готово, когда | Ожидание / уведомление |
 |---|---|---|---|---|---|---|---|---|---|
@@ -110,9 +112,10 @@
 | 13 | В реальное окружение | PR смержен | `merged` | код (без LLM) | — | — | — | `merged` | опрос каждые 5 мин, до 24 ч |
 | 14 | В реальное окружение | Из песочницы в реальное окружение | `go-live` | разработчик | master → Go deepseek | medium | 30 мин | `running_in_real_environment` |  |
 | 15 | В реальное окружение | Проверка сценария в реальном окружении | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
-| 16 | Архивация и следующие шаги | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 16 | В реальное окружение | Приёмка по принятым требованиям (независимый судья) | `verify-requirements` | проверяющий | master → Go deepseek | medium | 20 мин | `requirements_verified_by_independent_judge` |  |
+| 17 | Архивация и следующие шаги | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
-### `skill-tool` — Новый MCP-инструмент в доменном скиле (15 шагов)
+### `skill-tool` — Новый MCP-инструмент в доменном скиле (16 шагов)
 
 | # | Этап | Шаг | Тип | Кто | Уровень → модель сейчас | Контекст | Таймаут | Готово, когда | Ожидание / уведомление |
 |---|---|---|---|---|---|---|---|---|---|
@@ -130,7 +133,8 @@
 | 12 | Доставка и проверка в реальности | Деплой прошёл и живой | `deployed` | проверяющий | bachelor → Go deepseek | small | 1 ч | `deployed_version_is_live` |  |
 | 13 | Доставка и проверка в реальности | Тул виден в новой сессии | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
 | 14 | Доставка и проверка в реальности | Реальный вызов в живой сессии | `verify-real` | проверяющий | master → Go deepseek | medium | 20 мин | `user_scenario_verified_in_real_environment` |  |
-| 15 | Архивация | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
+| 15 | Доставка и проверка в реальности | Приёмка по принятым требованиям (независимый судья) | `verify-requirements` | проверяющий | master → Go deepseek | medium | 20 мин | `requirements_verified_by_independent_judge` |  |
+| 16 | Архивация | Архивация: доставить живые доки и закрыть план | `archive` | ревьюер | bachelor → Go deepseek | medium | 20 мин | `living_docs_updated_and_plan_closed` |  |
 
 ## Сверка с черновиком владельца
 
