@@ -68,15 +68,17 @@ function boostExact(chunk, query, base) {
   return { score: base.score, matchKind: base.sources.length ? base.sources[0].matchKind : 'fused' };
 }
 
-const STRATEGIES = ['auto', 'keyword', 'dense', 'hybrid'];
+const STRATEGIES = ['keyword', 'dense', 'hybrid'];
 
-// `auto` (the default) is the strategy the benchmark decided on: lexical first,
-// semantic only when lexical has no confident hit. Exact identifiers are
-// answered by string equality in ~0.2 s with no credentials; the cross-lingual
-// and behavioural classes — where BM25 measures 0 — pay for the embedding pass,
-// because that is where the measured recall lives (0.571 → 0.946 on 34 queries).
+// The default is `hybrid` because that is what the benchmark (#110, 34 labelled
+// queries against a real checkout) picked: it beats the lexical ranker
+// (recall@5 0.679 vs 0.571) without paying what `dense` costs — `dense`
+// measures strictly better (0.946) only because it embeds the WHOLE chunk set,
+// which is ~19 min cold for a 630-file checkout, once per revision. `dense`
+// stays available for hard cross-lingual lookups; promoting it to the default
+// waits on a vector cache that survives a new revision.
 function resolveStrategy(requested, { denseAvailable }) {
-  const want = String(requested || 'auto').toLowerCase();
+  const want = String(requested || 'hybrid').toLowerCase();
   if (!STRATEGIES.includes(want)) {
     const err = new Error(`strategy must be ${STRATEGIES.join('|')}, got "${requested}"`);
     err.code = 'INVALID_STRATEGY';
@@ -85,12 +87,6 @@ function resolveStrategy(requested, { denseAvailable }) {
   if (want === 'keyword') return { strategy: 'keyword', requested: want, degraded: null };
   if (!denseAvailable) return { strategy: 'keyword', requested: want, degraded: 'no-embeddings-provider' };
   return { strategy: want, requested: want, degraded: null };
-}
-
-// A lexical hit is an answer only when it matched on its own terms; `weak-*`
-// matches are the demoted single-word coincidences keywordRank labels as such.
-function hasConfidentLexicalHit(list) {
-  return list.some((hit) => !String(hit.matchKind || '').startsWith('weak-'));
 }
 
 async function repoSearch(input = {}) {
@@ -131,28 +127,16 @@ async function repoSearch(input = {}) {
   const keyword = keywordRank({ chunks: built.chunks, query, limit: poolSize });
 
   const apiKey = resolveApiKey(input.api_key || input.apiKey);
-  const requestedStrategy = String(input.strategy || 'auto').toLowerCase();
-  const wantsDense = requestedStrategy !== 'keyword';
-  const resolved = resolveStrategy(requestedStrategy, { denseAvailable: Boolean(apiKey) && wantsDense });
-
-  // `auto` decides AFTER the lexical pass: a confident lexical hit is already
-  // the answer (and costs nothing), otherwise the semantic pass runs and owns
-  // the ranking — it is measured strictly better than fusing the two.
-  let escalated = false;
-  if (resolved.strategy === 'auto') {
-    if (hasConfidentLexicalHit(keyword)) resolved.strategy = 'keyword';
-    else { resolved.strategy = 'dense'; escalated = true; }
-  }
+  const wantsDense = String(input.strategy || 'hybrid').toLowerCase() !== 'keyword';
+  const resolved = resolveStrategy(input.strategy, { denseAvailable: Boolean(apiKey) && wantsDense });
 
   // Embedding is the expensive half, so it is spent where it can matter:
-  //   auto   — only after lexical fails to produce a confident hit (see above);
   //   dense  — the whole chunk set (that is the honest cost of pure semantic
   //            retrieval, and the benchmark measures it);
   //   hybrid — only the lexical shortlist (retrieve → embed → rerank), which is
   //            what makes semantic ranking affordable on a real repository.
   const dense = { enabled: false, model, reason: null, stats: null, embeddedChunks: 0, shortlist: 0 };
   let denseHits = [];
-  let escalationFailed = false;
   if (resolved.strategy === 'dense' || resolved.strategy === 'hybrid') {
     const shortlist = resolved.strategy === 'hybrid'
       ? keyword.map((h) => h.chunk)
@@ -174,10 +158,7 @@ async function repoSearch(input = {}) {
     } else {
       dense.reason = (embedded.stats.errors && embedded.stats.errors[0] && embedded.stats.errors[0].code) || 'embeddings-unavailable';
     }
-    if (!dense.enabled) {
-      if (escalated) escalationFailed = true;
-      resolved.strategy = 'keyword';
-    }
+    if (!dense.enabled) resolved.strategy = 'keyword';
   }
 
   let fused = [];
@@ -236,13 +217,9 @@ async function repoSearch(input = {}) {
   if (dropped.length) limitations.push(`Dropped ${dropped.length} chunk(s) whose file no longer exists (deleted/renamed after the indexed revision).`);
   if (stale.length && !includeStale) limitations.push(`Excluded ${stale.length} hit(s) whose file changed after the indexed revision (pass include_stale to quote them).`);
   if (buildStats && buildStats.truncated) limitations.push(`Chunk budget reached (${buildStats.chunks} chunks): deeper files are not searched.`);
-  if (resolved.degraded && resolved.requested === 'auto') {
-    limitations.push(`No embedding provider configured, so the lexical ranker answered alone: cross-lingual and paraphrased questions are exactly where it measures weakest (${resolved.degraded}).`);
-  } else if (resolved.degraded) {
-    limitations.push(`Requested strategy "${resolved.requested}" degraded to "${resolved.strategy}": ${resolved.degraded}.`);
+  if (resolved.degraded) {
+    limitations.push(`Requested strategy "${resolved.requested}" degraded to "${resolved.strategy}": ${resolved.degraded}. A cross-lingual question ("где …" against English identifiers) is exactly what the lexical ranker alone cannot answer — pass strategy=dense with a provider configured, or expect a miss.`);
   }
-  if (escalated) limitations.push(`Lexical ranking had no confident match: the semantic pass over ${dense.shortlist} chunk(s) produced this answer.`);
-  if (escalationFailed) limitations.push(`Lexical ranking had no confident match and semantic re-ranking was unavailable (${dense.reason}).`);
 
   return {
     query,

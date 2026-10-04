@@ -198,55 +198,7 @@ test('the tool is registered with the required inputs', () => {
   assert.ok(tool, 'engineering_repo_search must be registered');
   assert.deepEqual([...tool.inputSchema.required].sort(), ['query', 'repo_path']);
   const strategies = tool.inputSchema.properties.strategy.enum;
-  assert.deepEqual([...strategies].sort(), ['auto', 'dense', 'hybrid', 'keyword']);
+  assert.deepEqual([...strategies].sort(), ['dense', 'hybrid', 'keyword']);
   assert.ok(/degrade/i.test(tool.description), 'the description must promise honest degradation');
-  assert.ok(/measured|recall/i.test(tool.description), 'the description must carry the measurement');
-});
-
-test('auto without an embedding provider answers lexically and says what it could not do', async () => {
-  const repo = makeRepo();
-  const result = await search(repo, 'acquireLock');
-
-  assert.equal(result.requested_strategy, 'auto');
-  assert.equal(result.strategy, 'keyword');
-  assert.equal(result.degraded, 'no-embeddings-provider');
-  assert.ok(
-    result.limitations.some((line) => line.includes('lexical ranker answered alone') && line.includes('cross-lingual')),
-    `auto must disclose the missing semantic pass: ${JSON.stringify(result.limitations)}`,
-  );
-  assert.ok(result.hits.length > 0, 'the lexical answer still stands');
-});
-
-test('auto keeps a confident lexical hit lexical and escalates only when lexical has none', async () => {
-  const repo = makeRepo();
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, options) => {
-    if (!String(url).includes('/api/v1/embeddings')) return realFetch(url, options);
-    const body = JSON.parse(options.body);
-    const data = body.input.map((text) => {
-      const vec = new Array(32).fill(0);
-      for (const ch of String(text)) vec[ch.charCodeAt(0) % 32] += 1;
-      const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
-      return { embedding: vec.map((v) => v / norm) };
-    });
-    return { ok: true, json: async () => ({ data }) };
-  };
-
-  try {
-    const confident = await search(repo, 'acquireLock', { api_key: 'test-key' });
-    assert.equal(confident.requested_strategy, 'auto');
-    assert.equal(confident.strategy, 'keyword', 'a confident lexical hit must not pay the embedding pass');
-    assert.equal(confident.dense.enabled, false);
-    assert.equal(confident.limitations.some((line) => line.includes('semantic pass')), false);
-
-    const crossLingual = await search(repo, 'где блокируется запуск задачи', { api_key: 'test-key' });
-    assert.equal(crossLingual.strategy, 'dense', 'no confident lexical hit must escalate to semantic ranking');
-    assert.equal(crossLingual.dense.enabled, true);
-    assert.ok(
-      crossLingual.limitations.some((line) => line.includes('Lexical ranking had no confident match')),
-      `escalation must be reported: ${JSON.stringify(crossLingual.limitations)}`,
-    );
-  } finally {
-    globalThis.fetch = realFetch;
-  }
+  assert.ok(/recall/i.test(tool.description), 'the description must carry the measurement');
 });

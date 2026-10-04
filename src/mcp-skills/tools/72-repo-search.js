@@ -13,7 +13,7 @@ module.exports = [{
       query: { type: 'string', description: 'Natural-language question or exact identifier.' },
       strategy: {
         type: 'string',
-        enum: ['auto', 'keyword', 'dense', 'hybrid'],
+        enum: ['keyword', 'dense', 'hybrid'],
         description: 'Ranking strategy, default auto: lexical first, semantic only when lexical has no confident hit. keyword = lexical only; dense = full-corpus semantic (best recall, pays the whole embedding pass); hybrid = reciprocal-rank fusion over the lexical shortlist. Without embedding credentials everything but keyword degrades to keyword and says so.',
       },
       limit: { type: 'number', description: 'Max sources to return (default 8).' },

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
+const path = require('path');
 const { prepareTask } = require('../src/prepare-task');
 const {
   spawnWorkspace,
@@ -15,6 +16,7 @@ const { repoStatus } = require('../src/repo-status');
 const { changeFind, changeBind } = require('../src/change-find');
 const { changeStatus } = require('../src/change-status');
 const { verify } = require('../src/verify');
+const { repoSearch } = require('../src/repo-search');
 
 function args(argv) {
   const out = { _: [] };
@@ -43,6 +45,9 @@ const USAGE = [
   '            [--cursor <n>] [--refresh] [--include-archived]',
   '',
   '  repo-status --repo <owner/name> [--prs 10] [--issues 10] [--refresh]',
+  '',
+  '  repo-search --repo <path> --query <text> [--strategy auto|keyword|dense|hybrid] [--limit 8]',
+  '             [--include src/,docs/] [--include-stale] [--refresh] [--max-chunks <n>]',
   '',
   '  change-find --repo <owner/name> (--task-ref <text> | --query <text>)',
   '              [--known-refs <ref,ref>] [--since <date>] [--until <date>] [--limit 10]',
@@ -186,6 +191,27 @@ async function main() {
       repo: a.repo,
       limits: Object.keys(limits).length ? limits : undefined,
       refresh: a.refresh === true,
+    }));
+  } else if (command === 'repo-search') {
+    if (!a.repo || a.repo === true) {
+      console.error('repo-search: pass --repo <path> (a local checkout)');
+      process.exit(2);
+    }
+    if (!a.query || a.query === true) {
+      console.error('repo-search: pass --query <text>');
+      process.exit(2);
+    }
+    print(await repoSearch({
+      repo_path: path.resolve(String(a.repo)),
+      query: a.query,
+      strategy: typeof a.strategy === 'string' ? a.strategy : undefined,
+      limit: a.limit !== undefined && a.limit !== true ? Number(a.limit) : undefined,
+      include: splitList(a.include),
+      include_stale: a['include-stale'] === true,
+      refresh: a.refresh === true,
+      max_chunks: a['max-chunks'] !== undefined && a['max-chunks'] !== true ? Number(a['max-chunks']) : undefined,
+      embed_model: typeof a['embed-model'] === 'string' ? a['embed-model'] : undefined,
+      workspaces_root: typeof a.root === 'string' ? a.root : undefined,
     }));
   } else if (command === 'repo-find') {
     if (!a.query || a.query === true) {
