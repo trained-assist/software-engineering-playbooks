@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reconciliation receipt: accepted requirements → delivered code → canonical baseline",
+  "description": "Receipt of ONE delivery step, in which code delivery and baseline (docs/spec/architecture) sync are two SEPARATE facts. The step may deliver code while the baseline is still pending; a receipt that claims a synced baseline without a commit and paths is false, not optimistic. Structural shape only — the honest-reading rules live in src/reconciliation/receipt.js (validate()), because a JSON Schema cannot say 'applied while a delta entry is not applied'.",
+  "type": "object",
+  "required": ["receipt_version", "plan", "requirements", "code_delivery", "baseline", "delta"],
+  "additionalProperties": false,
+  "properties": {
+    "receipt_version": { "const": 1 },
+    "plan": {
+      "type": "object",
+      "description": "Who produced this receipt. The (plan_id, step_id) pair is the idempotency key: a replay of the same step emits the same receipt, never a second one.",
+      "required": ["plan_id", "step_id"],
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": { "type": "string", "minLength": 1 },
+        "step_id": { "type": "string", "minLength": 1 },
+        "repo": { "type": "string" },
+        "issue": { "type": "string" }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "description": "The ACCEPTED requirements this delta is reconciled against, pinned to one revision. A newer revision makes an older receipt stale, not valid.",
+      "required": ["ref", "revision"],
+      "additionalProperties": false,
+      "properties": {
+        "ref": { "type": "string", "minLength": 1, "description": "issue#N, path:docs/spec.md, …" },
+        "revision": { "type": "string", "minLength": 1, "description": "revision marker of those requirements (@rev / commit sha)" },
+        "accepted_at": { "type": ["string", "null"] }
+      }
+    },
+    "code_delivery": {
+      "type": "object",
+      "description": "FACT 1 — what happened to the CODE. Independent of the baseline: merged code with a pending baseline is a normal, allowed state.",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "enum": ["merged", "delivered", "unknown"] },
+        "refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "pr:<url> / sha:<sha> / commit:<sha> — empty or missing is allowed only with state=unknown"
+        },
+        "note": { "type": "string" }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "description": "FACT 2 — what happened to the CANONICAL DOCS. Never inferred from code_delivery.",
+      "required": ["state"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "enum": ["applied", "pending", "not_applicable", "conflict"] },
+        "sync_kind": { "enum": ["in_pr", "followup_pr", "not_applicable"], "description": "in_pr = docs rode the merged code PR; followup_pr = separate tracked docs PR after merge" },
+        "commit": { "type": "string", "minLength": 1, "description": "baseline commit; REQUIRED for state=applied" },
+        "paths": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "canonical files actually touched; REQUIRED (non-empty) for state=applied" },
+        "pr": { "type": "string", "description": "docs PR url when sync_kind=followup_pr" },
+        "reason": { "type": "string", "description": "why not_applicable / why pending" }
+      }
+    },
+    "delta": {
+      "type": "array",
+      "description": "One entry per accepted requirement that the change touches. Per-requirement refs are the point: an unreferenced requirement is exactly the as-built story that drifts from reality.",
+      "items": {
+        "type": "object",
+        "required": ["kind", "requirement_id", "requirement_ref", "target", "evidence_refs"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "enum": ["ADDED", "MODIFIED", "REMOVED"] },
+          "requirement_id": { "type": "string", "minLength": 1 },
+          "requirement_ref": { "type": "string", "minLength": 1, "description": "issue#135#L17 — where the accepted requirement is written" },
+          "behavior_change": { "type": "boolean", "description": "true = behaviour the user/system can observe; such a delta belongs in spec/contract, never in architecture only" },
+          "target": {
+            "type": "object",
+            "required": ["kind", "path"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["spec", "contract", "architecture", "adr"] },
+              "path": { "type": "string", "minLength": 1 },
+              "section": { "type": "string" }
+            }
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "commit": { "type": "string" },
+              "pr": { "type": "string" },
+              "deployed": { "type": "boolean", "description": "true only when the change is observable in the running environment; deployed=false is a legitimate, honest value" }
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "verification receipts, PRs, logs — non-empty; 'the file exists' is not evidence that a delta was applied"
+          },
+          "applied": { "type": "boolean" },
+          "deferred": { "type": "boolean", "description": "consciously out of scope — must be visible as a followup or a missing requirement, never as done" },
+          "superseded_by": { "type": "string", "description": "required for REMOVED unless removal_evidence is given" },
+          "removal_evidence": { "type": "string" }
+        }
+      }
+    },
+    "missing_requirements": {
+      "type": "array",
+      "description": "Accepted requirements NOT reflected in the baseline. Empty is a claim the judge can check; absent means 'not collected'.",
+      "items": {
+        "type": "object",
+        "required": ["requirement_id", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "requirement_id": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 },
+          "followup_ref": { "type": "string" }
+        }
+      }
+    },
+    "followups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref", "why"],
+        "additionalProperties": false,
+        "properties": {
+          "ref": { "type": "string", "minLength": 1, "description": "issue#NN / doc path — a followup without a ref is a wish" },
+          "why": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "description": "Baseline edited concurrently (parallel merge) or refused. A conflict is recorded, never overwritten and never reported as applied.",
+      "items": {
+        "type": "object",
+        "required": ["path", "with"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "with": { "type": "string", "minLength": 1, "description": "commit / branch / PR that touched the same baseline" },
+          "resolution": { "type": "string" }
+        }
+      }
+    }
+  }
+}

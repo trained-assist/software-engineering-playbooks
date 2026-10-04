@@ -1,0 +1,74 @@
+{
+  "receipt_version": 1,
+  "plan": {
+    "plan_id": "t-a1",
+    "step_id": "archive",
+    "repo": "trained-assist/software-engineering-playbooks",
+    "issue": "issue#135"
+  },
+  "requirements": {
+    "ref": "issue#135",
+    "revision": "@2",
+    "accepted_at": "2026-10-04T11:33:48Z"
+  },
+  "code_delivery": {
+    "state": "merged",
+    "refs": [
+      "pr:https://github.com/trained-assist/software-engineering-playbooks/pull/131",
+      "sha:b8115fc27c4259d278eec03594d83515808d45f3"
+    ]
+  },
+  "baseline": {
+    "state": "applied",
+    "sync_kind": "in_pr",
+    "commit": "b8115fc27c4259d278eec03594d83515808d45f3",
+    "paths": [
+      "docs/user-scenarios/spec-reconciliation.md",
+      "docs/ARCHITECTURE.md"
+    ]
+  },
+  "delta": [
+    {
+      "kind": "ADDED",
+      "requirement_id": "R-135-1",
+      "requirement_ref": "issue#135#Работа-2",
+      "behavior_change": true,
+      "target": {
+        "kind": "spec",
+        "path": "docs/user-scenarios/spec-reconciliation.md",
+        "section": "Сценарий"
+      },
+      "source": {
+        "commit": "b8115fc27c4259d278eec03594d83515808d45f3",
+        "deployed": true
+      },
+      "evidence_refs": [
+        "verification:receipt-8811",
+        "pr:131"
+      ],
+      "applied": true
+    },
+    {
+      "kind": "MODIFIED",
+      "requirement_id": "R-135-3",
+      "requirement_ref": "issue#135#Работа-3",
+      "behavior_change": false,
+      "target": {
+        "kind": "architecture",
+        "path": "docs/ARCHITECTURE.md",
+        "section": "Архивация"
+      },
+      "source": {
+        "commit": "b8115fc27c4259d278eec03594d83515808d45f3"
+      },
+      "evidence_refs": [
+        "verification:receipt-8811"
+      ],
+      "applied": false,
+      "deferred": true
+    }
+  ],
+  "missing_requirements": [],
+  "followups": [],
+  "conflicts": []
+}
