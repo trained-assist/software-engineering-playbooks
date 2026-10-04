@@ -200,7 +200,8 @@ test('P14: recording a selection returns a verifiable effect receipt and one ext
   assert.equal(receipt.at, '2026-10-03T10:00:00.000Z');
   assert.match(receipt.receiptId, /^rcpt_[0-9a-f]{16}$/);
   assert.match(receipt.externalRef, /^sel_[0-9a-f]{12}$/);
-  assert.equal(outcome.result.selection.playbookVersion, 2, 'receipt pins a definition version, not just a name');
+  assert.equal(outcome.result.selection.playbookVersion, readJson('playbooks/debugging.json').version,
+    'receipt pins a definition version, not just a name');
 
   // Квитанция проверяема: у провайдера по externalRef лежит ровно одна запись,
   // и её содержимое совпадает с тем, что вернули наружу.
@@ -253,7 +254,7 @@ test('P14: an unknown outcome is never retried blindly — it is reconciled by o
     operationId: 'op-timeout',
     profileId: READ_CALLER.profileId,
     playbookId: 'feature',
-    playbookVersion: 2,
+    playbookVersion: readJson('playbooks/feature.json').version,
     reason: 'timeout path',
     bindingRef: WRITE_BINDING.ref,
     bindingScope: WRITE_SCOPE,

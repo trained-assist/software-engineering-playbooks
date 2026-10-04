@@ -26,6 +26,7 @@ Typed step library for the engineering playbooks. One step type = one reusable u
 | `merged` | PR смержен | apply (deliver) | программно | `merged` | ci-setup, debugging, feature, new-software, skill-tool |
 | `deployed` | Деплой прошёл и живой | apply (deliver) | verifier · bachelor | `deployed_version_is_live` | debugging, feature, skill-tool |
 | `verify-real` | Проверка сценария в реальном окружении | apply (verify) | verifier · master | `user_scenario_verified_in_real_environment` | ci-setup, feature, new-software, skill-tool |
+| `verify-requirements` | Приёмка по принятым требованиям (независимый судья) | verify (приёмка) | verifier · master | `requirements_verified_by_independent_judge` | debugging, feature, new-software, skill-tool |
 | `observe` | Наблюдение после релиза (если нужно) | — | verifier · bachelor | `post_release_observation_done_or_not_needed` | feature |
 | `confirm-fixed` | Подтвердить, что ошибка ушла в проде | — | verifier · bachelor | `error_gone_in_production` | debugging |
 | `repo-bootstrap` | Каркас репозитория | — (Spec Kit: constitution) | developer · bachelor | `repo_bootstrapped_with_ci_and_docs` | new-software |

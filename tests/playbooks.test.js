@@ -259,3 +259,53 @@ test('epic-delivery v3: statuses and checklists live in the GitHub Project and c
   assert.match(text['architecture-update'], /«Done»/);
   assert.match(text['final-acceptance'], /Раздел = эпик стадии/);
 });
+
+// ── #114: приёмка по принятым требованиям отдельным шагом ──────────────────
+
+const REQUIREMENTS_GATE = ['feature', 'debugging', 'new-software', 'skill-tool'];
+
+test('#114: every change-flow playbook judges the result against the accepted requirements', () => {
+  for (const id of REQUIREMENTS_GATE) {
+    const t = types(built.find(b => b.id === id));
+    assert.ok(t.includes('verify-requirements'), `${id}: has the requirements gate`);
+    // После проверки в реальном окружении: судья опирается на её evidence,
+    // и до archive (иначе приёмка остаётся позади архива).
+    const lastLive = Math.max(...['verify-real', 'confirm-fixed', 'go-live'].filter(x => t.includes(x)).map(x => t.indexOf(x)));
+    assert.ok(t.indexOf('verify-requirements') > lastLive, `${id}: the gate runs after the real-environment check`);
+    assert.ok(t.indexOf('verify-requirements') < t.indexOf('archive'), `${id}: the gate runs before archive`);
+  }
+  // epic-delivery не дублирует: там приёмка эпика — чек-лист из Project (final-acceptance).
+  assert.ok(!types(built.find(b => b.id === 'epic-delivery')).includes('verify-requirements'));
+});
+
+test('#114: the gate restores exact change identity and never upgrades unknown to done', () => {
+  const step = steps(built.find(b => b.id === 'feature')).find(s => s.step_type === 'verify-requirements');
+  assert.equal(step.execution_kind, 'agent');
+  assert.equal(step.executor_role, 'verifier');
+  assert.equal(step.minimum_model_level, 'master');
+  assert.deepEqual(step.validation, { requirements_verified_by_independent_judge: true });
+  assert.ok(!step.already_done, 'a semantic judgement is not a deterministic fast-skip');
+  for (const guard of [/engineering_change_find/, /engineering_change_status/, /engineering_verify\(/,
+    /точной связи|точный/i, /похожий/i, /unknown/, /Никогда не повышай unknown до satisfied/,
+    /требования — только принятые/i, /scope: implementation \| delivery \| user_scenario/]) {
+    assert.match(step.instructions, guard, `instructions keep the guard: ${guard}`);
+  }
+});
+
+test('#114: the outcome table is explicit — inconclusive is not a pass', () => {
+  const step = steps(built.find(b => b.id === 'feature')).find(s => s.step_type === 'verify-requirements');
+  const text = step.instructions;
+  assert.match(text, /verified → шаг закрыт/);
+  assert.match(text, /partial → ограниченный repair/);
+  assert.match(text, /not_met → блокер/);
+  assert.match(text, /inconclusive → это НЕ pass/);
+  assert.match(text, /продуктовая развилка[\s\S]*владельцу/);
+  // not_applicable — с основанием и альтернативным доказательством, а не молчанием.
+  assert.match(text, /not_applicable с основанием И альтернативным доказательством/);
+  // Бюджеты и ожидания — у runtime: судья не заводит своих циклов.
+  assert.match(text, /task_item_wait/);
+  assert.match(text, /своих циклов и повторов не заводи/);
+  // Checkpoint — refs и версии, а не копия состояния плана.
+  assert.match(text, /source refs и версии/);
+  assert.match(text, /Не копируй execution state/);
+});
