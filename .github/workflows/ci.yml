@@ -39,6 +39,8 @@ jobs:
             echo "Agent version: $(cd /tmp/agent && git rev-parse --short HEAD)"
             exit 1
           }
+      - name: Validation-key snapshot vs the agent registry (warn on drift)
+        run: node scripts/check-validation-keys.js --against-agent /tmp/agent
 
   staging-gate:
     runs-on: ubuntu-latest

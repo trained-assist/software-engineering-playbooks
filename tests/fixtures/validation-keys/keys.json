@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "source": "fixture — tests/validation-keys.test.js",
+  "keys": ["file_exists", "command_exit_zero", "pr_opened"]
+}
