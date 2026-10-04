@@ -91,6 +91,23 @@ test('exploration steps teach the repo_map-first rule (issue #49)', () => {
     'prompt domain teaches the rule');
 });
 
+// #143 — the baseline discipline must survive edits: it is what makes an unfinished
+// coding session recoverable (issue → workspace → pushed checkpoints → draft PR).
+test('engineering.md carries the baseline discipline', () => {
+  const md = fs.readFileSync(path.join(ROOT, 'src', 'prompt-domains', 'engineering.md'), 'utf8');
+  for (const marker of [
+    'engineering_spawn_workspace',  // rule 2 — work in a workspace
+    'engineering_release_workspace',
+    'draft PR',                     // rule 4 — first diff → draft PR
+    'engineering_change_find',      // rule 5 — resume verifies real state
+    'engineering_change_status',
+    'partial/blocked',              // rule 6 — never call local-only work saved/done
+    'read-only',                    // the prohibitions
+  ]) {
+    assert.match(md, new RegExp(marker.replace(/[/-]/g, '\\$&')), `baseline rule present: ${marker}`);
+  }
+});
+
 for (const pb of built) {
   test(`${pb.id}: valid Playbook v1`, () => {
     assert.deepEqual(validate(pb, schema), []);
