@@ -786,6 +786,28 @@ See `docs/GITHUB-ONBOARDING.md`.
 
 Engineering capabilities should plug into that mechanism rather than introducing a second loader.
 
+## Three manifests, three audiences
+
+| File | Owner / consumer | What it is |
+|---|---|---|
+| `src/mcp-skills/registry.js` + `tools/*.js` | the MCP surface (in-session **and** the headless bridge) | every tool this provider exposes. Auto-discovered — a new tool file is live immediately |
+| `provider-manifest.json` | this repo | the provider's own richer manifest (v3, adds `contextFields` / `connections`) |
+| `action-provider-manifest.json` | **`trained-assist-agent`** | what the core action/cron registry actually registers (`src/skill-siblings.js` `actionManifestPath`, `scripts/check-skill-schedule.js`, `scripts/deploy.sh`) |
+
+`action-provider-manifest.json` is **generated** from `provider-manifest.json` by
+`npm run build:action-manifest` (CI fails if it is stale: `npm run check:action-manifest`).
+Do not hand-edit it — edit `provider-manifest.json` and rebuild. The projection is
+v1 (`{version, providerId, actions}`) because that is the shape
+`ActionProviderRegistry.register()` accepts; the script REFUSES to project once
+`contextFields`/`connections` become non-empty, because dropping them would lose the
+domain surface and core's v2 contract requires a real v2 manifest.
+
+**Rule for a new tool:** add it under `src/mcp-skills/tools/` and it is already on the
+MCP surface. Add it to `provider-manifest.json` only if it is an *action* — something
+the platform may call without a human turn (cron, adapters, durable tasks). Interactive
+tools stay out of the manifest on purpose; `npm run manifest:check` warns about them
+rather than failing.
+
 Current integration epic:
 
 - `trained-assist-agent#1353`
