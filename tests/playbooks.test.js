@@ -91,20 +91,25 @@ test('exploration steps teach the repo_map-first rule (issue #49)', () => {
     'prompt domain teaches the rule');
 });
 
-// #143 — the baseline discipline must survive edits: it is what makes an unfinished
-// coding session recoverable (issue → workspace → pushed checkpoints → draft PR).
-test('engineering.md carries the baseline discipline', () => {
+// #143 slice 4 — the baseline discipline is a CORE prompt domain in the agent
+// (src/prompt-domains/engineering-baseline.md, asserted there), because a domain owned by
+// this sibling disappears from the prompt whenever turn-intent narrows the mount onto
+// another section — exactly the coding run that lost its save rules. This domain keeps only
+// the repo-specific mechanics and must not duplicate the baseline.
+test('engineering.md keeps the repo mechanics and points at the core baseline', () => {
   const md = fs.readFileSync(path.join(ROOT, 'src', 'prompt-domains', 'engineering.md'), 'utf8');
   for (const marker of [
-    'engineering_spawn_workspace',  // rule 2 — work in a workspace
+    'engineering_spawn_workspace',   // workspace lifecycle
     'engineering_release_workspace',
-    'draft PR',                     // rule 4 — first diff → draft PR
-    'engineering_change_find',      // rule 5 — resume verifies real state
+    'engineering_change_find',       // resume verifies the real state
     'engineering_change_status',
-    'partial/blocked',              // rule 6 — never call local-only work saved/done
-    'read-only',                    // the prohibitions
+    'engineering-baseline',          // pointer to the always-on baseline
   ]) {
-    assert.match(md, new RegExp(marker.replace(/[/-]/g, '\\$&')), `baseline rule present: ${marker}`);
+    assert.match(md, new RegExp(marker.replace(/[/-]/g, '\\$&')), `repo mechanic present: ${marker}`);
+  }
+  for (const duplicated of ['draft PR', 'partial/blocked']) {
+    assert.doesNotMatch(md, new RegExp(duplicated.replace(/[/-]/g, '\\$&')),
+      `baseline rule must not be duplicated here (always-on in core): ${duplicated}`);
   }
 });
 
