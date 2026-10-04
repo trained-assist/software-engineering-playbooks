@@ -1,0 +1,25 @@
+{
+  "id": "alpha",
+  "version": 1,
+  "scope": "system",
+  "title": "Fixture alpha",
+  "stages": [
+    {
+      "id": "frame",
+      "title": "Frame",
+      "steps": [
+        { "step_type": "checkable", "execution_kind": "agent", "validation": { "file_exists": "spec.md" } },
+        { "step_type": "unreachable", "execution_kind": "agent", "validation": { "semantic_thing": true } },
+        { "step_type": "advisory", "execution_kind": "agent", "advisory": true, "validation": { "another_semantic": true } }
+      ]
+    },
+    {
+      "id": "deliver",
+      "title": "Deliver",
+      "steps": [
+        { "step_type": "open-pr", "execution_kind": "agent", "validation": { "pr_opened": true } },
+        { "step_type": "merged", "execution_kind": "programmatic", "validation": { "file_exists": "x" } }
+      ]
+    }
+  ]
+}

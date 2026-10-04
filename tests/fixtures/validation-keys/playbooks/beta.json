@@ -1,0 +1,15 @@
+{
+  "id": "beta",
+  "version": 1,
+  "scope": "system",
+  "title": "Fixture beta — every key reachable",
+  "stages": [
+    {
+      "id": "run",
+      "title": "Run",
+      "steps": [
+        { "step_type": "checkable", "execution_kind": "agent", "validation": { "command_exit_zero": "npm test" } }
+      ]
+    }
+  ]
+}
