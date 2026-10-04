@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "source": "trained-assist-agent/src/playbook-validators.js createDefaultRegistry()",
+  "note": "The runtime registry of validation keys. A playbook step whose `validation` names a key outside this list is evaluated as inconclusive('no-validator') and cannot block the step. Keep in sync with the agent (scripts/check-validation-keys.mjs --against-agent).",
+  "keys": [
+    "ci_green",
+    "ci_and_staging_green",
+    "ci_run_green",
+    "merged",
+    "pr_merged",
+    "merged_and_deployed",
+    "pr_opened",
+    "file_exists",
+    "command_exit_zero",
+    "credential_present",
+    "http_ok",
+    "task_done",
+    "fanout_joined",
+    "issue_pr_merged",
+    "issue_pr_ci_green",
+    "workflow_run_completed",
+    "workflow_run_green",
+    "workflow_job_completed"
+  ]
+}
