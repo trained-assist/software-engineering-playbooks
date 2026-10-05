@@ -11,8 +11,8 @@
 //
 // Workflow:
 //   1. ba_clarify_requirements / ba_write_spec (62-business-analyst.js) — before any of this
-//   2. dev_workspace_setup — spawn an isolated per-task git worktree via this repo's
-//      workspace library (same as engineering_spawn_workspace)
+//   2. engineering_spawn_workspace (20-workspace.js) — spawn an isolated per-task git worktree
+//      via this repo's workspace library, set git identity, install hooks, detect deps
 //   3. Claude edits files with native Read/Edit/Write tools
 //   4. Claude runs tests via bash (npm test, pytest, etc.)
 //   5. Claude commits + pushes via bash; creates PR via github_create_pr
@@ -77,7 +77,7 @@ async function ghFetch(path, opts = {}) {
 }
 
 // Same hooks trained-assist-agent's own repos use (its .githooks/, copied to
-// templates/githooks/ here) — installed into every workspace dev_workspace_setup
+// templates/githooks/ here) — installed into every workspace engineering_spawn_workspace
 // touches so branch-per-session is enforced there too.
 const HOOKS_TEMPLATE_DIR = path.join(__dirname, '..', '..', '..', 'templates', 'githooks');
 
@@ -114,7 +114,7 @@ function run(cmd, args, opts = {}) {
 // ---------------------------------------------------------------------------
 // Isolated per-task workspaces (trained-assist-agent#1418, D1)
 //
-// `dev_workspace_setup` never clones into one shared per-VM tree: it calls
+// `engineering_spawn_workspace` never clones into one shared per-VM tree: it calls
 // `spawnWorkspaceForTask` (src/workspace), which forks an isolated git worktree +
 // branch (`eng/<principal>-<rootTaskId>`) off a per-repository mirror. One
 // workspace per (principal, repository, rootTaskId) — two tasks never share a
@@ -160,12 +160,16 @@ function withGitCredentials(token, fn) {
   }
 }
 
-function spawnTaskWorkspace({ repositoryUrl, rootTaskId, token }) {
-  if (!USER_ID) throw new Error('Не удалось определить профиль (USER_ID) для изолированного workspace.');
+function spawnTaskWorkspace({ repositoryUrl, rootTaskId, ref, token }) {
+  // No pre-check on USER_ID: spawnWorkspaceForTask owns that validation and raises the typed
+  // INVALID_BINDING error. A generic throw here would mask it (the tool-call layer relies on it).
+  // Read USER_ID at call time, not from the module constant: callers and tests set it per call,
+  // and "env wins over a smuggled principal argument" is the contract.
   return withGitCredentials(token, () => spawnWorkspaceForTask({
-    principal: USER_ID,
+    principal: process.env.USER_ID || '',
     repositoryUrl,
     rootTaskId,
+    ref,
     workspaceRoot: process.env.ENGINEERING_WORKSPACE_ROOT || undefined,
     mirrorsRoot: process.env.ENGINEERING_MIRRORS_ROOT || undefined,
   }));
@@ -210,6 +214,12 @@ module.exports = {
   // Shared GitHub plumbing — the registry only reads `.tools`/`.isReady`/
   // `.setupTools`, so extra exports here are inert (same as 60-github.js).
   getToken,
+  // Workspace mechanics shared with 20-workspace.js's engineering_spawn_workspace,
+  // which is the single "create a workspace" tool. They live here because
+  // dev_new_repo/dev_supersede_pr need them too.
+  spawnTaskWorkspace,
+  prepareWorkspace,
+  detectDependencies,
   isReady: () => {
     if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
     if (!USER_ID) return false;
@@ -218,47 +228,6 @@ module.exports = {
   setupTools: [],
 
   tools: {
-
-    dev_workspace_setup: {
-      description: 'Prepare an isolated development workspace for a GitHub repo: forks a per-task git worktree + branch (eng/<profile>-<task>) via the engineering workspace library, configures git identity, and detects/installs dependencies (npm/pip/cargo). Returns the workspace path. Two calls with different task labels get separate trees and branches. After this, Claude can edit files directly and run tests via bash.',
-      inputSchema: {
-        type: 'object',
-        required: ['repo'],
-        properties: {
-          repo: { type: 'string', description: 'owner/repo (e.g. acme/my-app), or a full git URL / local path' },
-          branch: { type: 'string', description: 'Human-readable task/branch label for this workspace. Becomes the branch eng/<profile>-<branch>. Defaults to the repo name.' },
-        },
-      },
-      handler: async ({ repo, branch }) => {
-        const token = getToken();
-        const rootTaskId = branch || repo.split('/').filter(Boolean).pop() || 'dev-workspace';
-        const result = spawnTaskWorkspace({
-          repositoryUrl: repositoryUrlOf(repo),
-          rootTaskId,
-          token,
-        });
-        const workspace = result.codePath;
-        prepareWorkspace(workspace);
-        const { deps, depsLog } = detectDependencies(workspace);
-        return {
-          workspace,
-          codePath: workspace,
-          workspaceId: result.workspaceId,
-          status: result.status,
-          repo,
-          branch: result.branch,
-          deps,
-          deps_log: depsLog,
-          next_steps: [
-            `cd ${workspace}  # isolated worktree for this task — work here`,
-            '# ... edit files, run tests ...',
-            'git add -p && git commit -m "feat: ..."',
-            `git push -u origin ${result.branch}`,
-            '# Then call github_create_pr to open the PR',
-          ],
-        };
-      },
-    },
 
     dev_new_repo: {
       description: 'Create a new GitHub repository, then prepare an isolated per-task workspace for it. Use when the user wants to start a project from scratch and doesn\'t have an existing repo.',

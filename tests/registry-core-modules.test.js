@@ -31,19 +31,18 @@ test('without a GitHub token only setup tools of the GitHub modules are listed',
   const { listed, all } = load({ USER_ID: 'nobody' });
   assert.ok(listed.includes('github_status'), 'setup tool stays listed');
   assert.ok(!listed.includes('github_create_pr'));
-  assert.ok(!listed.includes('dev_workspace_setup'));
   assert.ok(!listed.includes('pr_status'), '62-pr-status is gated without a token');
   assert.ok(!listed.includes('issue_status'), '62-pr-status is gated without a token');
   assert.ok(listed.includes('cicd_track_pr'), '63-ci-cd needs no token');
   assert.ok(listed.includes('engineering_spawn_workspace'), 'engineering-native tools unaffected');
-  for (const name of ['github_create_pr', 'dev_workspace_setup', 'dev_supersede_pr', 'cicd_track_pr', 'engineering_spawn_workspace', 'pr_status', 'issue_status']) {
+  for (const name of ['github_create_pr', 'dev_supersede_pr', 'cicd_track_pr', 'engineering_spawn_workspace', 'pr_status', 'issue_status']) {
     assert.ok(all.includes(name), `${name} in listAllTools`);
   }
 });
 
 test('with a GitHub token the moved tools are listed', () => {
   const { listed } = load({ USER_ID: 'someone', GH_TOKEN: 'x' });
-  for (const name of ['github_create_pr', 'github_pr_checks', 'pr_status', 'issue_status', 'dev_workspace_setup', 'dev_new_repo', 'dev_supersede_pr', 'cicd_track_pr']) {
+  for (const name of ['github_create_pr', 'github_pr_checks', 'pr_status', 'issue_status', 'dev_new_repo', 'dev_supersede_pr', 'cicd_track_pr']) {
     assert.ok(listed.includes(name), name);
   }
 });
@@ -55,7 +54,7 @@ test('SKILLS_RESOLVED hides modules of switched-off sections', () => {
   try {
     const { listed, all } = load({ USER_ID: 'someone', GH_TOKEN: 'x', SKILLS_RESOLVED: file });
     assert.ok(!listed.includes('github_create_pr'), 'own module hidden');
-    assert.ok(listed.includes('dev_workspace_setup'), 'another server\'s entry is ignored');
+    assert.ok(listed.includes('dev_new_repo'), 'another server\'s entry is ignored');
     assert.ok(all.includes('github_create_pr'), 'static catalog keeps hidden tools');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

@@ -1,8 +1,9 @@
 'use strict';
 
-// dev_workspace_setup (moved from trained-assist-agent core, #1631) forks an
-// isolated worktree per (profile, repo, task) through this repo's own workspace
-// library — no sibling path, no library seam. Runs against a local bare remote.
+// engineering_spawn_workspace forks an isolated worktree per (profile, repo, task)
+// through this repo's own workspace library, then prepares it (git identity, hooks,
+// deps). Runs against a local bare remote. dev_workspace_setup was the same mechanic
+// and was folded in (#124).
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -18,7 +19,8 @@ process.env.GH_TOKEN = 'test-token';
 delete process.env.GITHUB_TOKEN;
 process.env.ENGINEERING_WORKSPACE_ROOT = path.join(root, 'workspaces');
 process.env.ENGINEERING_MIRRORS_ROOT = path.join(root, 'mirrors');
-const dev = require('../src/mcp-skills/tools/61-dev.js');
+const tools = require('../src/mcp-skills/tools/20-workspace.js');
+const spawn = tools.find(t => t.name === 'engineering_spawn_workspace');
 
 test.after(() => {
   for (const key of ['USER_ID', 'GH_TOKEN', 'GITHUB_TOKEN', 'ENGINEERING_WORKSPACE_ROOT', 'ENGINEERING_MIRRORS_ROOT']) {
@@ -49,8 +51,8 @@ function makeRemote(name) {
 
 test('two task labels on one repo get two separate worktrees and branches', async () => {
   const remote = makeRemote('two-tasks');
-  const a = await dev.tools.dev_workspace_setup.handler({ repo: remote, branch: 'task-one' });
-  const b = await dev.tools.dev_workspace_setup.handler({ repo: remote, branch: 'task-two' });
+  const a = await spawn.handler({ repository_url: remote, root_task_id: 'task-one' });
+  const b = await spawn.handler({ repository_url: remote, root_task_id: 'task-two' });
 
   assert.equal(a.status, 'code_ready');
   assert.equal(a.workspace, a.codePath);
@@ -62,15 +64,14 @@ test('two task labels on one repo get two separate worktrees and branches', asyn
   assert.equal(git(b.codePath, ['rev-parse', '--abbrev-ref', 'HEAD']), 'eng/tester-task-two');
 });
 
-test('the task label defaults to the repo name', async () => {
-  const remote = makeRemote('label-default');
-  const res = await dev.tools.dev_workspace_setup.handler({ repo: remote });
-  assert.equal(res.branch, 'eng/tester-label-default');
+test('root_task_id is required — no implicit label from the repo name', async () => {
+  const remote = makeRemote('label-required');
+  await assert.rejects(() => spawn.handler({ repository_url: remote }), /rootTaskId|root_task_id/);
 });
 
 test('the GitHub token is never persisted and the credential env is restored', async () => {
   const remote = makeRemote('no-token-on-disk');
-  await dev.tools.dev_workspace_setup.handler({ repo: remote, branch: 'token-check' });
+  await spawn.handler({ repository_url: remote, root_task_id: 'token-check' });
 
   assert.equal(process.env.AGENT_GIT_TOKEN, undefined);
   assert.equal(process.env.GIT_CONFIG_COUNT, undefined);
@@ -82,5 +83,5 @@ test('the GitHub token is never persisted and the credential env is restored', a
 });
 
 test('the shared-directory dev_workspace_list tool stays removed', () => {
-  assert.equal(dev.tools.dev_workspace_list, undefined);
+  assert.equal(tools.find(t => t.name === 'dev_workspace_list'), undefined);
 });
