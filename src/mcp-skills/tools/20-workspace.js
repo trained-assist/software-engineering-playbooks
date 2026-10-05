@@ -1,6 +1,9 @@
 'use strict';
 
-const { spawnWorkspaceForTask, statusWorkspaceForTask, releaseWorkspaceForTask } = require('../../workspace');
+const { statusWorkspaceForTask, releaseWorkspaceForTask } = require('../../workspace');
+// The token-aware spawn + workspace prep used to live on a second tool (dev_workspace_setup).
+// There was only ever one mechanic, so it is one tool now: engineering_spawn_workspace.
+const { getToken, spawnTaskWorkspace, prepareWorkspace, detectDependencies } = require('./61-dev.js');
 
 // `principal` is host-derived identity, never a tool-call argument: it comes
 // from the MCP server process env (USER_ID), matching how trained-assist-agent's
@@ -24,7 +27,7 @@ const COLLISION_HINT = 'A BRANCH_COLLISION error means another task already clai
 
 const spawn = {
   name: 'engineering_spawn_workspace',
-  description: `Create an isolated git worktree + branch for a task, ready to code in. Call this once you have decided to make a branch/PR — it clones/refreshes the repository mirror and bases a new 'eng/<profile>-<root_task_id>' branch off the default branch (or ref). ${CODE_PATH_HINT} ${COLLISION_HINT}`,
+  description: `Create an isolated git worktree + branch for a task, ready to code in. Call this once you have decided to make a branch/PR — it clones/refreshes the repository mirror and bases a new 'eng/<profile>-<root_task_id>' branch off the default branch (or ref), then sets git identity, installs repo hooks and detects/installs dependencies (npm/pip/cargo). Two calls with different root_task_id get separate trees and branches. ${CODE_PATH_HINT} ${COLLISION_HINT}`,
   inputSchema: {
     type: 'object',
     required: ['repository_url', 'root_task_id'],
@@ -35,15 +38,28 @@ const spawn = {
     }
   },
   handler: async ({ repository_url, root_task_id, ref } = {}) => {
-    const { principal, workspaceRoot, mirrorsRoot } = context();
-    return spawnWorkspaceForTask({
-      principal,
+    // A token lets private repos clone; without one public repos still work, so this is
+    // not a gate — it degrades instead of refusing.
+    let token = null;
+    try { token = getToken(); } catch { /* no GitHub token — proceed unauthenticated */ }
+
+    const result = spawnTaskWorkspace({
       repositoryUrl: repository_url,
       rootTaskId: root_task_id,
       ref,
-      workspaceRoot,
-      mirrorsRoot,
+      token,
     });
+    const workspace = result.codePath;
+    prepareWorkspace(workspace);
+    const { deps, depsLog } = detectDependencies(workspace);
+    return {
+      ...result,
+      workspace,
+      codePath: workspace,
+      repo: repository_url,
+      deps,
+      deps_log: depsLog,
+    };
   },
 };
 

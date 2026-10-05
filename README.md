@@ -953,7 +953,7 @@ src/
   prompt-domains/       # engineering.md, github.setup.md — read by core's prompt-domains loader
   token-value.js        # mirror of trained-assist-agent src/token-value.js (agent-tokens readers)
 
-templates/githooks/     # pre-commit / pre-push installed by dev_workspace_setup
+templates/githooks/     # pre-commit / pre-push installed by engineering_spawn_workspace
 templates/ci.yml        # manual test-run workflow for a repo without one (ci-setup drops it in)
 
 contracts/              # incl. playbook.schema.json (vendored Playbook v1),
