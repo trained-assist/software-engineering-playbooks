@@ -1,6 +1,6 @@
 {
   "id": "skill-tool",
-  "version": 3,
+  "version": 4,
   "scope": "system",
   "title": "Новый MCP-инструмент в доменном скиле",
   "when": "Нужно добавить инструмент (MCP-тул) в существующий доменный скил (hh, sales, documents, freelance, speech, search): конвенции репо скила → файл и схема тула → исполняемый тест хендлера и регистрации → правило в промпт-домене → PR с зелёными CI и staging → деплой ядра → проверка в живой сессии. Обычную фичу или баг в продукте веди `feature`/`debugging`, новый модуль с нуля — `new-software`; изменение ядра или шлюза этот плейбук не покрывает.",
@@ -14,16 +14,23 @@
       "derive": "github_repo"
     }
   ],
-  "defaults": { "max_attempts": 3, "execution_timeout_seconds": 1200, "recovery_policy": "default" },
+  "defaults": {
+    "max_attempts": 3,
+    "execution_timeout_seconds": 1200,
+    "recovery_policy": "default"
+  },
   "notes": [
-    "Скил живёт отдельно от ядра: мерж его PR ещё не равно прод. Чекауты скилов на сервере синхронизируются только при деплое ядра, поэтому шаг «deployed» обязан доказать мерж-коммит в чекауте скила, а шаг «виден в новой сессии» — что его действительно подхватила новая сессия."
+    "Скил живёт отдельно от ядра: мерж его PR ещё не равно прод. Чекауты скилов на сервере синхронизируются только при деплое ядра, поэтому шаг «deployed» обязан доказать мерж-коммит в чекауте скила, а шаг «виден в новой сессии» — что его действительно подхватила новая сессия.",
+    "Для интеграции/MCP runtime изменения укажи sandbox endpoint, реальные тестовые credentials/bindings по именам (без значений), input/output/logs, повтор/reset и production promotion в Environment Contract. Проведи разрешённый sandbox E2E; отказ тестировать только из-за возможной ошибки вреден. Не направляй тестовые вызовы в production."
   ],
   "stages": [
     {
       "id": "frame",
       "title": "Рамка: сценарий, контекст, сложность",
       "steps": [
-        { "use": "define-use-case" },
+        {
+          "use": "define-use-case"
+        },
         {
           "use": "explore-context",
           "title": "Скил-репо и конвенции тулов",
@@ -36,17 +43,27 @@
             "Верни в итоге ссылки файл:строка по каждому пункту — следующие шаги не должны искать конвенции заново."
           ]
         },
-        { "use": "requirements-complexity" }
+        {
+          "use": "requirements-complexity"
+        }
       ]
     },
     {
       "id": "propose",
       "title": "Предложение и декларация плана",
       "steps": [
-        { "use": "propose-change" },
+        {
+          "use": "propose-change"
+        },
         {
           "use": "plan-declaration",
-          "on_complete": [{ "type": "notify", "to": "owner", "text": "План зафиксирован в issue: {goal}" }]
+          "on_complete": [
+            {
+              "type": "notify",
+              "to": "owner",
+              "text": "План зафиксирован в issue: {goal}"
+            }
+          ]
         }
       ]
     },
@@ -87,7 +104,13 @@
         },
         {
           "use": "open-pr",
-          "on_complete": [{ "type": "notify", "to": "owner", "text": "PR открыт, жду CI: {goal}" }]
+          "on_complete": [
+            {
+              "type": "notify",
+              "to": "owner",
+              "text": "PR открыт, жду CI: {goal}"
+            }
+          ]
         }
       ]
     },
@@ -97,8 +120,12 @@
       "steps": [
         {
           "use": "ci-green",
-          "validation": { "ci_and_staging_green": true },
-          "already_done": { "ci_and_staging_green": true },
+          "validation": {
+            "ci_and_staging_green": true
+          },
+          "already_done": {
+            "ci_and_staging_green": true
+          },
           "notes": [
             "Валидатор ci_and_staging_green, а не ci_green: правило владельца 2026-09-16 — мержу только когда зелёный И CI, И staging на актуальной версии PR; устаревший красный не закрывается молча.",
             "Ветка A: в .github/workflows/ci.yml целевого репо есть job staging-gate → жди оба через durable wait по ключу ci_and_staging_green с ссылкой на PR.",
@@ -106,7 +133,9 @@
             "Красное → разберись по логам; PR неизменяемы, фикс идёт новой веткой и новым PR (или через уже открытый autofix-PR). Устаревший конкретный тест в этом же PR можно заменить, назвав путь, причину, изменившееся требование и заменяющий исполняемый тест."
           ]
         },
-        { "use": "merged" },
+        {
+          "use": "merged"
+        },
         {
           "use": "deployed",
           "execution_timeout_seconds": 3600,
@@ -148,12 +177,26 @@
       "id": "archive",
       "title": "Архивация",
       "steps": [
-        { "use": "archive" }
+        {
+          "use": "archive"
+        }
       ]
     }
   ],
   "hooks": {
-    "task_done": [{ "type": "notify", "to": "owner", "text": "Готово и проверено в реальном окружении: {goal}" }],
-    "task_failed": [{ "type": "notify", "to": "owner", "text": "План застрял: {goal} — {error}" }]
+    "task_done": [
+      {
+        "type": "notify",
+        "to": "owner",
+        "text": "Готово и проверено в реальном окружении: {goal}"
+      }
+    ],
+    "task_failed": [
+      {
+        "type": "notify",
+        "to": "owner",
+        "text": "План застрял: {goal} — {error}"
+      }
+    ]
   }
 }
