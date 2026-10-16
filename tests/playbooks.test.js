@@ -171,6 +171,11 @@ for (const pb of built.filter(b => CHANGE_FLOW.has(b.id))) {
     before('implement', 'open-pr');
     before('open-pr', 'ci-green');
     before('ci-green', 'merged');
+    const declaration = steps(pb).find(s => s.step_type === 'plan-declaration');
+    assert.match(declaration.instructions, /Definition of Done/);
+    assert.match(declaration.instructions, /promotion path/);
+    assert.match(steps(pb).find(s => s.step_type === 'deployed' || s.step_type === 'go-live').instructions,
+      /поставк|реальное окружение/);
     assert.equal(t[t.length - 1], 'archive', 'every playbook ends with archive');
     assert.ok(t.includes('verify-real') || t.includes('confirm-fixed'), 'done only after checking the real environment');
     assert.ok(pb.hooks && pb.hooks.task_done && pb.hooks.task_failed, 'owner is notified on done/failed');
@@ -184,6 +189,11 @@ test('debugging: confirms in production by waiting for the error to come back', 
   assert.match(confirm.instructions, /task_item_wait/);
   assert.match(confirm.instructions, /journalctl/);
   assert.ok(types(pb).indexOf('confirm-fixed') > types(pb).indexOf('deployed'));
+});
+
+test('ci-setup: consumer verification is required after merge', () => {
+  const pb = built.find(b => b.id === 'ci-setup');
+  assert.match(steps(pb).find(s => s.step_type === 'verify-real').instructions, /потребителя/);
 });
 
 test('new-software: infrastructure discovery precedes the solution choice', () => {
