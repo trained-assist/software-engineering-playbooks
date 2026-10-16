@@ -51,6 +51,16 @@ when you change what a step means. The runtime contract (durable waits, validato
 `trained-assist-agent` (`src/durable-wait.js`, `src/playbook-validators.js`, `src/playbook-compiler.js`);
 `contracts/playbook.schema.json` here is a copy of that repo's schema — keep them in sync.
 
+For an ordinary product change, the default completion target is a verified result for its user:
+sandbox check, pushed PR, green CI, merge, confirmed promotion of the exact revision, and a safe
+end-to-end check in the receiving environment. The shared `plan-declaration` step records that
+checklist and the target repository's actual promotion path before implementation. An explicit
+user request for a narrower deliverable changes that target. For libraries, docs, and tooling,
+record the consumer and the equivalent acceptance check. If the consumer or safe promotion path
+is unknown, keep that criterion open and report the gap after completing the available checks;
+merge by itself is not evidence of a live consumer change. The mounted engineering prompt domain
+in `src/prompt-domains/engineering.md` gives the same rule to agents outside a playbook run.
+
 ### Where the policy is actually enforced
 
 Two layers declare policy here; only one of them runs in production. Read this before trusting any

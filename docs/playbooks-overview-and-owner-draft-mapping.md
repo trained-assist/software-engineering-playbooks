@@ -2,7 +2,7 @@
 
 > Сгенерировано `scripts/build-playbooks.js` из `playbooks-src/*.json` и `library/step-types.json`.
 > Прави источники и генератор, не этот файл: `npm run build:playbooks`, свежесть держит `npm run check:playbooks` (гейт CI).
-> Сверка с черновиком владельца «Software Engineering Playbooks» (2026-09-27). Версии источников: ci-run v1 · ci-setup v2 · debugging v4 · epic-delivery v4 · feature v4 · new-software v4 · skill-tool v4.
+> Сверка с черновиком владельца «Software Engineering Playbooks» (2026-09-27). Версии источников: ci-run v1 · ci-setup v3 · debugging v5 · epic-delivery v4 · feature v5 · new-software v5 · skill-tool v5.
 
 ## Коротко
 
