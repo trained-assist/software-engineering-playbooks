@@ -2,7 +2,7 @@
 
 The checklist catalog is a small, opt-in aid for turning a coding request into a few useful TODO groups. It complements durable playbooks: checklists guide discovery and verification; playbooks describe longer workflows with external lifecycle steps.
 
-For an ordinary development task the checklist now includes the default delivery path (separate branch/worktree -> PR -> green CI -> merge -> deploy/verify) unless the user explicitly asks for a narrower deliverable or passes `delivery: false`.
+For an ordinary development task the checklist now includes the default delivery path (local verify -> separate branch/worktree -> PR -> green CI -> merge -> deploy/verify -> rollback on failure -> cleanup) unless the user explicitly asks for a narrower deliverable or passes `delivery: false`.
 
 ## Selection model
 
