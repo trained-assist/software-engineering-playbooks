@@ -1,8 +1,12 @@
 # software-engineering-playbooks
 
-*(formerly `trained-assist-engineering`; the VM checkout still uses the old name)*
+(Formerly trained-assist-engineering; use this repository's canonical name for new links.)
 
-Reusable software-engineering control plane for the `trained-assist` ecosystem.
+Reusable software-engineering capabilities and playbook artifacts for the trained-assist ecosystem.
+
+Документы содержат действующие требования, контракты и инструкции. Планы выполнения, статусы, ревью прошлых версий и evidence ведутся в GitHub issues/PR/Project. Целевая модель не является утверждением о текущем deployment; его готовность проверяется по конкретным SHA и приёмке.
+
+Retiring GCP VM is not a development or fallback target. Use the own Agent Run API and serverless by default; a necessary persistent service belongs on the existing French VM. Other Google services remain allowed. Exit coordination: https://github.com/trained-assist/trained-agent-architecture/issues/145.
 
 This repository exists to make coding agents **faster, safer and easier to coordinate** across many repositories and many concurrent tasks.
 
