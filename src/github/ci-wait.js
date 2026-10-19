@@ -51,7 +51,7 @@ function classifyChecks(checkRuns, names) {
   const aggregate = (runs) => {
     const grouped = new Map();
     for (const run of runs) {
-      const key = `${run.name}\0${run.status}\0${run.conclusion || ''}`;
+      const key = `${run.name}\\0${run.status}\\0${run.conclusion || ''}`;
       const value = grouped.get(key) || { name: run.name, status: run.status, conclusion: run.conclusion || null, count: 0, url: run.html_url || null };
       value.count += 1;
       grouped.set(key, value);
@@ -120,20 +120,24 @@ async function snapshot(input, request) {
   if (input.run_id != null) {
     const run = await request(`/repos/${repo}/actions/runs/${encodeURIComponent(String(input.run_id))}`);
     const complete = run.status === 'completed';
-    const outcome = !complete ? 'pending'
-      : FAILING_CONCLUSIONS.has(run.conclusion) ? 'failure'
-        : run.conclusion === 'success' ? 'success' : 'completed_with_non_success';
     let failedJobs = [];
-    if (complete && outcome === 'failure') {
+    const shouldFetchJobs = !complete || FAILING_CONCLUSIONS.has(run.conclusion);
+    if (shouldFetchJobs) {
       try {
         const jobs = await request(`/repos/${repo}/actions/runs/${encodeURIComponent(String(input.run_id))}/jobs?filter=latest&per_page=100`);
-        failedJobs = (jobs.jobs || []).filter(job => job.conclusion === 'failure').map(job => ({
-          name: job.name || null, conclusion: job.conclusion, url: job.html_url || null,
-        }));
+        failedJobs = (jobs.jobs || [])
+          .filter(job => FAILING_CONCLUSIONS.has(job.conclusion))
+          .map(job => ({
+            name: job.name || null, conclusion: job.conclusion, url: job.html_url || null,
+          }));
       } catch {
-        // Keep the terminal run verdict even when optional job details are unavailable.
+        // Keep the run verdict even when optional job details are unavailable.
       }
     }
+    const outcome = failedJobs.length > 0 ? 'failure'
+      : !complete ? 'pending'
+        : FAILING_CONCLUSIONS.has(run.conclusion) ? 'failure'
+          : run.conclusion === 'success' ? 'success' : 'completed_with_non_success';
     return {
       finished: complete || failedJobs.length > 0,
       outcome,
