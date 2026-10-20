@@ -115,13 +115,111 @@ function resolveToken() {
   }
 }
 
-async function snapshot(input, request) {
+function configuredEventRelay() {
+  const baseUrl = process.env.GITHUB_EVENT_RELAY_URL || '';
+  const token = process.env.GITHUB_EVENT_RELAY_TOKEN || '';
+  if (!baseUrl || token.length < 32) return null;
+  try {
+    const url = new URL(baseUrl);
+    if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') return null;
+    return { baseUrl: url.origin, token };
+  } catch {
+    return null;
+  }
+}
+
+async function openEventStream(repo, config, fetchImpl, signal, lastEventId) {
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  const connectTimer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const url = new URL('/v1/events/stream', config.baseUrl);
+    url.searchParams.set('repo', repo);
+    const response = await fetchImpl(url, {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        Accept: 'text/event-stream',
+        ...(lastEventId ? { 'Last-Event-ID': lastEventId } : {}),
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(connectTimer);
+    if (!response.ok || !response.body) throw new Error(`event_relay_http_${response.status}`);
+    return {
+      reader: response.body.getReader(),
+      decoder: new TextDecoder(),
+      buffer: '',
+      controller,
+      signal,
+      onAbort,
+    };
+  } catch (error) {
+    clearTimeout(connectTimer);
+    signal?.removeEventListener('abort', onAbort);
+    controller.abort();
+    throw error;
+  }
+}
+
+async function readEventFrame(stream) {
+  while (true) {
+    const boundary = stream.buffer.indexOf('\n\n');
+    if (boundary >= 0) {
+      const frame = stream.buffer.slice(0, boundary);
+      stream.buffer = stream.buffer.slice(boundary + 2);
+      const lines = frame.split(/\r?\n/u);
+      const data = lines.filter(line => line.startsWith('data:'))
+        .map(line => line.slice(5).trimStart()).join('\n');
+      if (data) return {
+        event: JSON.parse(data),
+        cursor: lines.find(line => line.startsWith('id:'))?.slice(3).trim() || null,
+      };
+      continue;
+    }
+    const { done, value } = await stream.reader.read();
+    if (done) return null;
+    stream.buffer += stream.decoder.decode(value, { stream: true });
+  }
+}
+
+async function closeEventStream(stream) {
+  if (!stream) return;
+  stream.signal?.removeEventListener('abort', stream.onAbort);
+  stream.controller.abort();
+  try { await stream.reader.cancel(); } catch { /* already closed */ }
+}
+
+async function failedJobFromEvent(input, request, eventHint) {
+  if (eventHint?.event_type !== 'workflow_job' || eventHint.action !== 'completed') return null;
+  const subject = eventHint.subject || {};
+  if (!subject.job_id || !FAILING_CONCLUSIONS.has(subject.conclusion)) return null;
+  if (input.check_names?.length && !input.check_names.includes(subject.name)) return null;
+  if (input.run_id != null && String(subject.workflow_run_id) !== String(input.run_id)) return null;
+  const expectedSha = input.sha || (input.pr_number != null ? input.resolved_head_sha : null);
+  if (expectedSha && subject.head_sha?.toLowerCase() !== expectedSha.toLowerCase()) return null;
+  const repo = encodeURIComponent(input.repo).replace('%2F', '/');
+  try {
+    const job = await request(`/repos/${repo}/actions/jobs/${encodeURIComponent(String(subject.job_id))}`);
+    if (job.status !== 'completed' || !FAILING_CONCLUSIONS.has(job.conclusion)) return null;
+    if (input.run_id != null && String(job.run_id) !== String(input.run_id)) return null;
+    if (expectedSha && job.head_sha?.toLowerCase() !== expectedSha.toLowerCase()) return null;
+    if (input.check_names?.length && !input.check_names.includes(job.name)) return null;
+    return { name: job.name || subject.name || null, conclusion: job.conclusion, url: job.html_url || subject.html_url || null };
+  } catch (error) {
+    if (error?.status === 404) return null;
+    throw error;
+  }
+}
+
+async function snapshot(input, request, eventHint) {
   const repo = encodeURIComponent(input.repo).replace('%2F', '/');
   if (input.run_id != null) {
     const run = await request(`/repos/${repo}/actions/runs/${encodeURIComponent(String(input.run_id))}`);
     const complete = run.status === 'completed';
-    let failedJobs = [];
-    const shouldFetchJobs = !complete || FAILING_CONCLUSIONS.has(run.conclusion);
+    const eventFailedJob = await failedJobFromEvent(input, request, eventHint);
+    let failedJobs = eventFailedJob ? [eventFailedJob] : [];
+    const shouldFetchJobs = !eventFailedJob && (!complete || FAILING_CONCLUSIONS.has(run.conclusion));
     if (shouldFetchJobs) {
       try {
         const jobs = await request(`/repos/${repo}/actions/runs/${encodeURIComponent(String(input.run_id))}/jobs?filter=latest&per_page=100`);
@@ -305,24 +403,101 @@ async function waitForCi(input, deps = {}) {
   const deadline = startedAt + normalized.timeout_minutes * 60_000;
   let polls = 0;
   let lastSnapshot;
+  let eventStream = null;
+  let pendingEvent = null;
+  let eventWakeups = 0;
+  let eventMode = 'polling';
+  let lastEventHint = null;
+  let lastEventId = null;
+  let reconnectEventStream = false;
+  const eventRelay = deps.eventRelay || configuredEventRelay();
+  if (eventRelay) {
+    try {
+      eventStream = await openEventStream(normalized.repo, eventRelay,
+        deps.eventRelayFetch || globalThis.fetch, deps.signal, lastEventId);
+      eventMode = 'webhook';
+      pendingEvent = readEventFrame(eventStream).then(
+        packet => ({ kind: packet ? 'event' : 'closed', packet }),
+        () => ({ kind: 'closed' }),
+      );
+    } catch {
+      // Event delivery is an optimization; GitHub polling remains the fallback.
+      reconnectEventStream = true;
+    }
+  }
+  const finish = async result => {
+    await closeEventStream(eventStream);
+    return result;
+  };
+  const reconciliationSeconds = () => eventStream
+    ? Math.max(normalized.interval_seconds, 300)
+    : normalized.interval_seconds;
+  const reportMode = () => ({
+    event_mode: eventMode,
+    event_wakeups: eventWakeups,
+    reconciliation_interval_seconds: reconciliationSeconds(),
+  });
+  const waitForNextCheck = async ms => {
+    if (eventRelay && !eventStream && reconnectEventStream && !deps.signal?.aborted) {
+      try {
+        eventStream = await openEventStream(normalized.repo, eventRelay,
+          deps.eventRelayFetch || globalThis.fetch, deps.signal, lastEventId);
+        eventMode = 'webhook';
+        pendingEvent = readEventFrame(eventStream).then(
+          packet => ({ kind: packet ? 'event' : 'closed', packet }),
+          () => ({ kind: 'closed' }),
+        );
+      } catch { /* remain on GitHub polling */ }
+    }
+    if (!eventStream || !pendingEvent) {
+      await wait(ms);
+      return;
+    }
+    const result = await Promise.race([
+      pendingEvent,
+      wait(ms).then(() => ({ kind: 'timer' })),
+    ]);
+    if (result.kind === 'event') {
+      if (result.packet.cursor && /^\d+$/.test(result.packet.cursor)) lastEventId = result.packet.cursor;
+      lastEventHint = result.packet.event;
+      eventWakeups += 1;
+      pendingEvent = readEventFrame(eventStream).then(
+        packet => ({ kind: packet ? 'event' : 'closed', packet }),
+        () => ({ kind: 'closed' }),
+      );
+      return;
+    }
+    if (result.kind === 'closed') {
+      await closeEventStream(eventStream);
+      eventStream = null;
+      pendingEvent = null;
+      reconnectEventStream = true;
+      eventMode = eventMode === 'webhook' ? 'webhook_then_polling' : eventMode;
+    }
+  };
 
   while (true) {
     if (deps.signal?.aborted) {
-      return report(normalized, { state: 'cancelled', outcome: 'pending', snapshot: lastSnapshot }, startedAt, polls, {}, now);
+      return finish(report(normalized, { state: 'cancelled', outcome: 'pending', snapshot: lastSnapshot }, startedAt, polls,
+        reportMode(), now));
     }
     if (polls > 0 && now() >= deadline) {
-      return report(normalized, { state: 'timed_out', outcome: 'pending', snapshot: lastSnapshot }, startedAt, polls, {}, now);
+      return finish(report(normalized, { state: 'timed_out', outcome: 'pending', snapshot: lastSnapshot }, startedAt, polls,
+        reportMode(), now));
     }
     polls += 1;
     try {
-      lastSnapshot = await snapshot(normalized, request);
+      const eventHint = lastEventHint;
+      lastEventHint = null;
+      lastSnapshot = await snapshot(normalized, request, eventHint);
       if (normalized.pr_number != null && !normalized.sha && lastSnapshot.sha) {
         normalized.sha = lastSnapshot.sha;
         normalized.pr_url = lastSnapshot.pr_url;
       }
     } catch (error) {
       if (deps.signal?.aborted) {
-        return report(normalized, { state: 'cancelled', outcome: 'pending', snapshot: lastSnapshot }, startedAt, polls, {}, now);
+        return finish(report(normalized, { state: 'cancelled', outcome: 'pending', snapshot: lastSnapshot }, startedAt, polls,
+          reportMode(), now));
       }
       const status = error.status;
       if (status === 401 || status === 403 || status === 404 || status === 429) {
@@ -330,31 +505,35 @@ async function waitForCi(input, deps = {}) {
           : status === 403 ? 'Недостаточно прав для чтения этих проверок либо исчерпан лимит GitHub.'
             : status === 404 ? 'Репозиторий, PR, commit или run не найден либо недоступен этому токену.'
               : 'GitHub rate limit достигнут; ожидание остановлено до сброса лимита.';
-        return report(normalized, { state: 'error', outcome: 'error', error: reason }, startedAt, polls,
-          { http_status: status, retry_after: error.retryAfter || null, rate_limit_reset: error.rateLimitReset || null }, now);
+        return finish(report(normalized, { state: 'error', outcome: 'error', error: reason }, startedAt, polls,
+          { http_status: status, retry_after: error.retryAfter || null, rate_limit_reset: error.rateLimitReset || null,
+            ...reportMode() }, now));
       }
       if (now() >= deadline) {
-        return report(normalized, { state: 'error', outcome: 'error', error: `Не удалось получить состояние GitHub: ${error.message}` }, startedAt, polls, {}, now);
+        return finish(report(normalized, { state: 'error', outcome: 'error', error: `Не удалось получить состояние GitHub: ${error.message}` }, startedAt, polls,
+          reportMode(), now));
       }
-      await wait(Math.min(normalized.interval_seconds * 1000, Math.max(0, deadline - now())));
+      await waitForNextCheck(Math.min(reconciliationSeconds() * 1000, Math.max(0, deadline - now())));
       continue;
     }
     const hasFailure = (Array.isArray(lastSnapshot.failed_checks) && lastSnapshot.failed_checks.length > 0)
       || (Array.isArray(lastSnapshot.failed_jobs) && lastSnapshot.failed_jobs.length > 0);
     if (lastSnapshot.finished || hasFailure) {
       const outcome = hasFailure ? 'failure' : lastSnapshot.outcome;
-      return report(normalized, { state: 'completed', outcome, snapshot: { ...lastSnapshot, outcome } }, startedAt, polls, {}, now);
+      return finish(report(normalized, { state: 'completed', outcome, snapshot: { ...lastSnapshot, outcome } }, startedAt, polls,
+        reportMode(), now));
     }
     if (!token && lastSnapshot.rate_limit_remaining !== null && Number(lastSnapshot.rate_limit_remaining) <= 5) {
-      return report(normalized, {
+      return finish(report(normalized, {
         state: 'rate_limited', outcome: 'pending', snapshot: lastSnapshot,
         error: 'Осталось мало анонимных запросов GitHub; остановил ожидание до исчерпания общего IP-лимита.',
-      }, startedAt, polls, {}, now);
+      }, startedAt, polls, reportMode(), now));
     }
     if (now() >= deadline) {
-      return report(normalized, { state: 'timed_out', outcome: 'pending', snapshot: lastSnapshot }, startedAt, polls, {}, now);
+      return finish(report(normalized, { state: 'timed_out', outcome: 'pending', snapshot: lastSnapshot }, startedAt, polls,
+        reportMode(), now));
     }
-    await wait(Math.min(normalized.interval_seconds * 1000, Math.max(0, deadline - now())));
+    await waitForNextCheck(Math.min(reconciliationSeconds() * 1000, Math.max(0, deadline - now())));
   }
 }
 
