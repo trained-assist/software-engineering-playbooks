@@ -83,6 +83,7 @@ Extract/adapt current issue-fixer pipeline:
 - bounded autofix attempts;
 - integrate existing `trained-assist/pr-autofix` instead of duplicating it;
 - merge admission / queue coordination through one integration owner.
+- event-driven GitHub CI waiting (PR / linked issue / active repository checks), with authenticated webhook delivery, explicit subscription lifecycle, reconciliation and polling fallback — see [`ci-event-wait-epic`](user-scenarios/engineering/ci-event-wait-epic.md).
 
 ## Phase 8 — Engineering memory
 
