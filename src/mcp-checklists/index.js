@@ -38,7 +38,7 @@ const TOOL = {
 
 const CI_WAIT_TOOL = {
   name: 'engineering_ci_wait',
-  description: 'Wait for GitHub Actions or commit checks to finish, then wake this tool call with a concise success/failure/timeout report. Always pass repo and exactly what to observe: run_id, sha, or pr_number. Uses a read-only GitHub fetch, default interval 3 minutes and timeout 15 minutes; interval cannot be shorter than 3 minutes and timeout cannot exceed 90 minutes. Public repositories can be read without a token; private repositories need a read-capable token. A failed check is returned immediately as a completed failure so the agent can inspect/fix it.',
+  description: 'Wait for GitHub Actions or commit checks to finish, then wake this tool call with a concise success/failure/timeout report. Always pass repo and exactly what to observe: run_id, sha, or pr_number. When GITHUB_EVENT_RELAY_URL and GITHUB_EVENT_RELAY_TOKEN are configured, GitHub webhook events wake this wait immediately; GitHub API reconciliation still runs at the configured interval. Otherwise it polls GitHub directly every three minutes by default. Timeout defaults to 15 minutes and is capped at 90. Public repositories can be read without a GitHub token; private repositories need a read-capable token. A failed check returns immediately so the agent can inspect/fix it.',
   inputSchema: {
     type: 'object',
     required: ['repo'],

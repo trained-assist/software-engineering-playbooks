@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trained-assist-github-event-relay",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-20",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "GITHUB_EVENT_CHANNELS", "class_name": "GitHubEventChannel" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GitHubEventChannel"] }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "GITHUB_EVENTS", "queue": "trained-assist-github-events" }
+    ],
+    "consumers": [
+      {
+        "queue": "trained-assist-github-events",
+        "max_batch_size": 20,
+        "max_batch_timeout": 5,
+        "max_retries": 8,
+        "dead_letter_queue": "trained-assist-github-events-dlq"
+      }
+    ]
+  }
+}
