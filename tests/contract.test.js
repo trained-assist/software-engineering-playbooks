@@ -58,6 +58,39 @@ test('provider manifest actions map to registered tools with matching required i
   }
 });
 
+test('the checklists provider manifest matches the tools the checklists server serves', () => {
+  const checklistsManifest = readJson('checklists-provider-manifest.json');
+  const checklists = require('../src/mcp-checklists/index');
+  const tools = [checklists.TOOL, checklists.CI_WAIT_TOOL, checklists.AGENT_RUN_START_TOOL, checklists.AGENT_RUN_WAIT_TOOL];
+  const byName = new Map(tools.map((t) => [t.name, t]));
+
+  assert.equal(checklistsManifest.providerId, 'engineering-checklists',
+    'the checklist surface keeps its own providerId — folding it into `engineering` would widen the catalog every host registers');
+  assert.equal(checklistsManifest.actions.length, tools.length, 'every served tool is declared');
+  for (const action of checklistsManifest.actions) {
+    const tool = byName.get(action.name);
+    assert.ok(tool, `manifest action ${action.name} has no tool`);
+    const declared = new Set(action.inputSchema.required || []);
+    const actual = new Set(tool.inputSchema.required || []);
+    assert.deepEqual([...declared].sort(), [...actual].sort(), `${action.name} required inputs differ`);
+    for (const field of Object.keys(action.inputSchema.properties || {})) {
+      assert.ok(field in (tool.inputSchema.properties || {}), `${action.name}.${field} is not in the tool schema`);
+    }
+    assert.ok(Array.isArray(action.allowedTriggers) && action.allowedTriggers.length > 0, `${action.name} must declare allowedTriggers`);
+    assert.ok(typeof action.effect === 'string' && action.effect.length > 0, `${action.name} must declare effect`);
+    assert.equal(typeof action.requiresApproval, 'boolean', `${action.name} must declare requiresApproval`);
+    assert.ok(typeof action.retrySafety === 'string' && action.retrySafety.length > 0, `${action.name} must declare retrySafety`);
+  }
+});
+
+test('no tool name is exposed by both providers', () => {
+  const engineering = new Set(registry.listTools().map((t) => t.name));
+  const checklists = require('../src/mcp-checklists/index');
+  for (const tool of [checklists.TOOL, checklists.CI_WAIT_TOOL, checklists.AGENT_RUN_START_TOOL, checklists.AGENT_RUN_WAIT_TOOL]) {
+    assert.ok(!engineering.has(tool.name), `duplicate tool name across providers: ${tool.name}`);
+  }
+});
+
 test('Task Packet contract keeps raw-repo as a source (index is never a hard dependency)', () => {
   assert.ok(taskPacketSchema.properties.source.enum.includes('raw-repo'));
   assert.ok(taskPacketSchema.properties.source.enum.includes('indexed-repo'));

@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "providerId": "engineering-checklists",
+  "description": "Local opt-in checklist + CI-wait + remote-run provider. Deliberately a SEPARATE providerId from `engineering`: the checklist surface is user-local and opt-in, and must not widen the trained-assist-engineering provider catalog that trained-assist-agent registers.",
+  "actions": [
+    {
+      "name": "engineering_checklist_prepare",
+      "inputSchema": {
+        "type": "object",
+        "required": ["task", "repo_path"],
+        "properties": {
+          "task": { "type": "string" },
+          "repo_path": { "type": "string" },
+          "intent": { "type": "string" },
+          "delivery": { "type": "boolean" }
+        }
+      },
+      "allowedTriggers": ["user"],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "engineering_ci_wait",
+      "inputSchema": {
+        "type": "object",
+        "required": ["repo"],
+        "properties": {
+          "repo": { "type": "string" },
+          "run_id": { "type": ["string", "integer"] },
+          "sha": { "type": "string" },
+          "pr_number": { "type": "integer" },
+          "check_names": { "type": "array" },
+          "interval_seconds": { "type": "integer" },
+          "timeout_minutes": { "type": "integer" }
+        }
+      },
+      "allowedTriggers": ["user"],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    },
+    {
+      "name": "agent_run_start",
+      "inputSchema": {
+        "type": "object",
+        "required": ["task", "idempotency_key"],
+        "properties": {
+          "task": { "type": "string" },
+          "idempotency_key": { "type": "string" },
+          "timeout_seconds": { "type": "integer" },
+          "connection_id": { "type": "string" }
+        }
+      },
+      "allowedTriggers": ["user"],
+      "effect": "write",
+      "requiresApproval": true,
+      "retrySafety": "idempotent"
+    },
+    {
+      "name": "agent_run_wait",
+      "inputSchema": {
+        "type": "object",
+        "required": ["run_id"],
+        "properties": {
+          "run_id": { "type": "string" },
+          "timeout_seconds": { "type": "integer" },
+          "interval_seconds": { "type": "integer" }
+        }
+      },
+      "allowedTriggers": ["user"],
+      "effect": "read",
+      "requiresApproval": false,
+      "retrySafety": "read_only"
+    }
+  ]
+}
