@@ -20,6 +20,18 @@ try {
   configuration = () => null;
 }
 
+// The runner is optional. The tools stay DECLARED either way (a declared tool
+// with an honest "not configured" error beats an invisible one), so the agent
+// can tell "the runner is not wired up" from "this API does not exist".
+function runnerMissingError(toolName) {
+  return {
+    ok: false,
+    error: 'RUNNER_NOT_CONFIGURED',
+    tool: toolName,
+    message: 'Remote agent runner is not configured: set SERVERLESS_AGENT_API_URL and SERVERLESS_AGENT_API_KEY in the MCP server environment.',
+  };
+}
+
 const TOOL = {
   name: 'engineering_checklist_prepare',
   description: 'Use before planning a bug fix, code change, or test strategy when the engineering checklist MCP is enabled. Inspects project files read-only and returns a short, adaptable checklist plus evidence-backed test and runtime options. For an ordinary development task the checklist includes the default delivery path (separate branch/worktree -> PR -> green CI -> merge -> deploy/verify) unless the user explicitly asks for a narrower deliverable. It never runs commands or changes files. Pass the current repository root and the user task; do not use for purely informational questions.',
@@ -106,8 +118,9 @@ async function handleRequest(request, { pending = new Map(), wait = waitForCi,
       serverInfo: { name: 'engineering-checklists', version: '1.2.0' },
     });
   }
-  if (request.method === 'tools/list') return response(request.id, { tools: [TOOL, CI_WAIT_TOOL,
-    ...(runnerConfig ? [AGENT_RUN_START_TOOL, AGENT_RUN_WAIT_TOOL] : [])] });
+  if (request.method === 'tools/list') {
+    return response(request.id, { tools: [TOOL, CI_WAIT_TOOL, AGENT_RUN_START_TOOL, AGENT_RUN_WAIT_TOOL] });
+  }
   if (request.method !== 'tools/call') return failure(request.id, -32601, `Method not found: ${request.method}`);
   const name = request.params?.name;
   if (![TOOL.name, CI_WAIT_TOOL.name, AGENT_RUN_START_TOOL.name, AGENT_RUN_WAIT_TOOL.name].includes(name)) return failure(request.id, -32602, `Unknown tool: ${name || ''}`);
@@ -115,6 +128,8 @@ async function handleRequest(request, { pending = new Map(), wait = waitForCi,
   let result;
   if (name === TOOL.name) {
     result = prepareChecklist({ task: args.task, repoPath: args.repo_path, intent: args.intent || 'auto', ...args });
+  } else if ((name === AGENT_RUN_START_TOOL.name || name === AGENT_RUN_WAIT_TOOL.name) && !runnerConfig) {
+    result = runnerMissingError(name);
   } else {
     const controller = new AbortController();
     pending.set(String(request.id), controller);
