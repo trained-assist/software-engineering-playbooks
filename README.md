@@ -815,6 +815,22 @@ registries: every action must map to a real MCP tool, the required inputs must
 match the tool's own schema, and a tool name may not be exposed by two providers
 at once (a duplicate name in one agent context is silent shadowing).
 
+## The MCP composition declaration
+
+`mcp-servers.json` says which MCP servers compose the stack, what each one is
+for, which repository and revision it runs, and how many tools it publishes.
+`npm run check:mcp-servers` validates that declaration; with
+`--host-config ~/.config/opencode/opencode.json` it also compares it with what
+the host actually runs:
+
+- a declared server may not disappear from the host, and a server that is not
+  declared may not run there;
+- a local server must be started from a **clean checkout of the declared
+  repository at the pinned revision** — an uncommitted working tree is a running
+  state that exists nowhere else and cannot be reproduced;
+- two enabled servers may not publish the same tool name: in one agent context
+  one of them shadows the other, chosen by start order rather than by intent.
+
 `action-provider-manifest.json` is **generated** from `provider-manifest.json` by
 `npm run build:action-manifest` (CI fails if it is stale: `npm run check:action-manifest`).
 Do not hand-edit it — edit `provider-manifest.json` and rebuild. The projection is
