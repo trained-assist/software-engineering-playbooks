@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { prepareChecklist, classifyTask, inspectRepository } = require('../src/checklists/prepare');
-const { TOOL, CI_WAIT_TOOL, handleRequest } = require('../src/mcp-checklists');
+const { TOOL, CI_WAIT_TOOL, handleRequest } = require('../src/mcp-skills/providers/checklists');
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'engineering-checklist-'));

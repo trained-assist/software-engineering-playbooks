@@ -35,7 +35,7 @@ const { createStdioRpcClient, createHttpApiClient, outcomeFingerprint, extractOu
 const { createHttpApiServer, reserveLoopbackPort } = require('../src/mcp-sandbox/transports/http-server');
 const { createStdioMcpServer } = require('../src/mcp-sandbox/transports/stdio-server');
 const { readEvents } = require('../src/playbook-artifacts/events');
-const jsonrpc = require('../src/mcp-sandbox/transports/jsonrpc');
+const jsonrpc = require('../src/mcp-protocol');
 
 const REPO = path.resolve(__dirname, '..');
 const STDIO_ENTRY = path.join(REPO, 'src', 'mcp-sandbox', 'transports', 'stdio-server.js');
@@ -584,9 +584,9 @@ test('in-process сервер stdio отвечает на тот же контр
   const env = makeEnv(dataRoot);
   const server = createStdioMcpServer({ env });
   assert.equal(server.startupFailure, null);
-  const initialize = server.handle({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
+  const initialize = await server.handle({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
   assert.equal(initialize.result.protocolVersion, '2025-06-18');
-  const list = server.handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
+  const list = await server.handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   assert.equal(list.result.tools.length, 2);
   const response = await server.handle({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'sandbox_recruiting_search_status', arguments: { search_id: 'search-demo-1' } } });
   assert.equal(response.result.structuredContent.kind, 'completed');

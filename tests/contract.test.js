@@ -58,9 +58,9 @@ test('provider manifest actions map to registered tools with matching required i
   }
 });
 
-test('the checklists provider manifest matches the tools the checklists server serves', () => {
+test('the checklists provider manifest matches the tools the checklists provider serves', () => {
   const checklistsManifest = readJson('checklists-provider-manifest.json');
-  const checklists = require('../src/mcp-checklists/index');
+  const checklists = require('../src/mcp-skills/providers/checklists');
   const tools = checklists.TOOLS;
   const byName = new Map(tools.map((t) => [t.name, t]));
 
@@ -85,7 +85,7 @@ test('the checklists provider manifest matches the tools the checklists server s
 
 test('no tool name is exposed by both providers', () => {
   const engineering = new Set(registry.listTools().map((t) => t.name));
-  const checklists = require('../src/mcp-checklists/index');
+  const checklists = require('../src/mcp-skills/providers/checklists');
   for (const tool of checklists.TOOLS) {
     assert.ok(!engineering.has(tool.name), `duplicate tool name across providers: ${tool.name}`);
   }

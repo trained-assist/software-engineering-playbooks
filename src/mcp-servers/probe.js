@@ -9,8 +9,42 @@
 // The point of the probe is to see the catalog as the HOST sees it — a tool
 // name that two servers both publish is a silent shadowing bug in the agent
 // context, and no static file in the repo can prove it is gone.
+//
+// That is why the probe runs the server with the ENVIRONMENT OF THE HOST: a
+// server that changes its catalog with the environment (the local credential
+// store publishes 8 tools without its local mode and 23 with it) publishes
+// something else here than there. The environment of the host may also carry
+// placeholders like {file:/path/to/secret} — the host resolves them before it
+// starts the server, and so does the probe.
 
 const { spawn } = require('child_process');
+const fs = require('fs');
+
+const FILE_PLACEHOLDER = /^\{file:(.+)\}$/;
+
+function resolveValue(value) {
+  if (typeof value !== 'string') return value;
+  const match = FILE_PLACEHOLDER.exec(value.trim());
+  if (!match) return value;
+  try {
+    return fs.readFileSync(match[1], 'utf8').trim();
+  } catch {
+    // The host would start the server without the value too — an unreadable
+    // secret is an absent secret, not a crash of the check.
+    return '';
+  }
+}
+
+// The environment the host starts a server with, with the placeholders
+// resolved.
+function resolveEnvironment(environment) {
+  if (!environment || typeof environment !== 'object') return {};
+  const resolved = {};
+  for (const [key, value] of Object.entries(environment)) {
+    resolved[key] = resolveValue(value);
+  }
+  return resolved;
+}
 
 function parseMessages(buffer, onMessage) {
   let index;
@@ -26,6 +60,7 @@ function parseMessages(buffer, onMessage) {
 }
 
 // `command` is the argv the host uses to start the server (node + entrypoint).
+// `env` is the environment of the host — the probe must not invent one.
 // Resolves to { ok, tools: string[], error } — never throws.
 function probeTools(command, { timeoutMs = 30000, env } = {}) {
   return new Promise(resolve => {
@@ -37,7 +72,7 @@ function probeTools(command, { timeoutMs = 30000, env } = {}) {
     try {
       child = spawn(command[0], command.slice(1), {
         stdio: ['pipe', 'pipe', 'ignore'],
-        env: { ...process.env, ...env },
+        env: { ...process.env, ...resolveEnvironment(env) },
       });
     } catch (error) {
       resolve({ ok: false, tools: [], error: error.message });
@@ -85,4 +120,4 @@ function probeTools(command, { timeoutMs = 30000, env } = {}) {
   });
 }
 
-module.exports = { probeTools };
+module.exports = { probeTools, resolveEnvironment, resolveValue };

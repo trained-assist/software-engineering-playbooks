@@ -18,13 +18,14 @@ const { execFileSync } = require('child_process');
 const {
   validateDeclaration,
   compareHost,
-  checkToolNameCollisions,
+  checkLiveCatalog,
   checkComposition,
 } = require('../src/mcp-servers');
 const { probeTools } = require('../src/mcp-servers/probe');
 
 const ROOT = path.join(__dirname, '..');
 const declaration = JSON.parse(fs.readFileSync(path.join(ROOT, 'mcp-servers.json'), 'utf8'));
+const ENTRYPOINT = path.join(ROOT, 'src', 'mcp-skills', 'index.js');
 
 function hostConfig(servers) {
   return { mcp: { servers } };
@@ -187,35 +188,75 @@ test('two servers that publish the same tool name are an error', async () => {
     alpha: { type: 'local', enabled: true, role: 'a', source: { repository: 'x/y', entrypoint: 'a.js', ref: null } },
     beta: { type: 'local', enabled: true, role: 'b', source: { repository: 'x/z', entrypoint: 'b.js', ref: null } },
   };
-  const { errors } = await checkToolNameCollisions(servers, host, {
+  const { errors } = await checkLiveCatalog(servers, host, {
     probe: async () => ({ ok: true, tools: ['shared_tool', 'own_tool'], error: null }),
   });
   assert.ok(errors.some(e => /tool name "shared_tool" is published by 2 servers/.test(e)),
     `a duplicate tool name is an error: ${errors.join(' | ')}`);
 });
 
-test('the two engineering providers publish disjoint tool names', async () => {
+test('the catalog the host sees must match the declared tool count', async () => {
   const host = hostConfig({
-    'engineering-skills': {
-      type: 'local',
-      command: [process.execPath, path.join(ROOT, 'src', 'mcp-skills', 'index.js')],
-      cwd: ROOT,
-      environment: { USER_ID: 'check-mcp-servers-test' },
-    },
-    'engineering-checklists': {
-      type: 'local',
-      command: [process.execPath, path.join(ROOT, 'src', 'mcp-checklists', 'index.js')],
-      cwd: ROOT,
-    },
+    alpha: { type: 'local', command: ['node', '/alpha.js'] },
   });
-  const { errors } = await checkToolNameCollisions(declaration.servers, host);
-  assert.deepEqual(errors, [], `no duplicate tool names: ${errors.join(' | ')}`);
+  const servers = {
+    alpha: {
+      type: 'local', enabled: true, role: 'a',
+      source: { repository: 'x/y', entrypoint: 'a.js', ref: null },
+      expectedToolCount: 7,
+    },
+  };
+  const { errors } = await checkLiveCatalog(servers, host, {
+    probe: async () => ({ ok: true, tools: ['one', 'two'], error: null }),
+  });
+  assert.ok(errors.some(e => /"alpha" publishes 2 tools, but the declaration says 7/.test(e)),
+    `a catalog that does not match the declaration is an error: ${errors.join(' | ')}`);
 });
 
 test('the probe reads the tools/list of a live MCP server', async () => {
-  const answer = await probeTools([process.execPath, path.join(ROOT, 'src', 'mcp-checklists', 'index.js')]);
+  const answer = await probeTools([process.execPath, ENTRYPOINT], { env: { ENGINEERING_MCP_PROVIDERS: 'checklists' } });
   assert.equal(answer.ok, true, answer.error || '');
   assert.deepEqual(answer.tools.sort(), ['agent_run_start', 'agent_run_wait', 'engineering_checklist_prepare', 'engineering_ci_wait']);
+});
+
+test('the single entry point serves the engineering provider by default and the checklist surface on request', async () => {
+  const defaultCatalog = await probeTools([process.execPath, ENTRYPOINT]);
+  assert.equal(defaultCatalog.ok, true, defaultCatalog.error || '');
+  assert.equal(defaultCatalog.tools.length, 49, 'the default catalog is the engineering provider alone');
+  assert.ok(!defaultCatalog.tools.includes('engineering_checklist_prepare'), 'the checklist surface is opt-in');
+
+  const merged = await probeTools([process.execPath, ENTRYPOINT], { env: { ENGINEERING_MCP_PROVIDERS: 'engineering,checklists' } });
+  assert.equal(merged.ok, true, merged.error || '');
+  assert.equal(merged.tools.length, 53, 'both providers are served by the same process');
+  for (const name of ['engineering_checklist_prepare', 'engineering_ci_wait', 'agent_run_start', 'agent_run_wait']) {
+    assert.ok(merged.tools.includes(name), `${name} is served`);
+  }
+});
+
+test('the providers of the host must be the declared ones', () => {
+  const host = hostConfig({
+    'engineering-skills': {
+      type: 'local',
+      command: ['node', '/somewhere/src/mcp-skills/index.js'],
+      environment: { ENGINEERING_MCP_PROVIDERS: 'engineering' },
+    },
+  });
+  const { errors } = compareHost(declaration, declaration.servers, host, { repoRoot: ROOT });
+  assert.ok(errors.some(e => /"engineering-skills" serves the providers \[engineering\], but the declaration says \[engineering, checklists\]/.test(e)),
+    `the provider set is compared with the declaration: ${errors.join(' | ')}`);
+});
+
+test('the servers of the stack publish disjoint tool names', async () => {
+  const host = hostConfig({
+    'engineering-skills': {
+      type: 'local',
+      command: [process.execPath, ENTRYPOINT],
+      cwd: ROOT,
+      environment: { USER_ID: 'check-mcp-servers-test', ENGINEERING_MCP_PROVIDERS: 'engineering,checklists' },
+    },
+  });
+  const { errors } = await checkLiveCatalog(declaration.servers, host);
+  assert.deepEqual(errors, [], `no duplicate tool names: ${errors.join(' | ')}`);
 });
 
 test('a server that cannot be started is a warning, never a crash', async () => {

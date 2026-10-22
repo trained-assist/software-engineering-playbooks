@@ -1,14 +1,25 @@
-#!/usr/bin/env node
 'use strict';
 
-const readline = require('node:readline');
-const { prepareChecklist } = require('../checklists/prepare');
-const { waitForCi } = require('../github/ci-wait');
+// The checklist surface of this repository, as a PROVIDER.
+//
+// It used to be a server of its own (src/mcp-checklists/index.js): a second
+// stdio process, a second copy of the JSON-RPC frame, a second tool list. Now
+// it is a provider the single entry point (src/mcp-skills/index.js) can serve
+// — opt-in, because the checklist surface is user-local and adding it to the
+// default catalog would widen the surface every host of trained-assist-agent
+// registers.
+//
+// The provider owns its TOOLS and its calls. The transport owns the frame.
+
+const { prepareChecklist } = require('../../checklists/prepare');
+const { waitForCi } = require('../../github/ci-wait');
+const { createTransport, initializeResult, jsonrpc } = require('../../mcp-protocol');
+
 let agentRunStart = null;
 let agentRunWait = null;
 let configuration = () => null;
 try {
-  const runModule = require('../serverless-agent/run');
+  const runModule = require('../../serverless-agent/run');
   if (runModule && typeof runModule.configuration === 'function') {
     agentRunStart = runModule.agentRunStart || null;
     agentRunWait = runModule.agentRunWait || null;
@@ -101,77 +112,121 @@ const AGENT_RUN_WAIT_TOOL = {
 // places).
 const TOOLS = [TOOL, CI_WAIT_TOOL, AGENT_RUN_START_TOOL, AGENT_RUN_WAIT_TOOL];
 
-function response(id, result) {
-  return { jsonrpc: '2.0', id, result };
-}
+const PROVIDER_ID = 'checklists';
+const SERVER_INFO = { name: 'engineering-checklists', version: '1.2.0' };
 
-function failure(id, code, message) {
-  return { jsonrpc: '2.0', id, error: { code, message } };
-}
+/**
+ * Create the checklist provider.
+ *
+ * Every dependency is injectable so the provider can be exercised without a
+ * network, a runner and a real cancellation.
+ */
+function createChecklistsProvider(deps = {}) {
+  const {
+    pending = new Map(),
+    wait = waitForCi,
+    startRun = agentRunStart,
+    waitRun = agentRunWait,
+  } = deps;
+  // "not provided" means "read the environment"; an explicit null means "there
+  // is no runner" — the difference is what the NOT_CONFIGURED error is about.
+  const resolveRunnerConfig = () => (Object.prototype.hasOwnProperty.call(deps, 'runnerConfig')
+    ? deps.runnerConfig
+    : configuration());
 
-async function handleRequest(request, { pending = new Map(), wait = waitForCi,
-  startRun = agentRunStart, waitRun = agentRunWait, runnerConfig = configuration() } = {}) {
-  if (!request || typeof request !== 'object') return null;
-  if (request.method === 'notifications/cancelled') {
-    pending.get(String(request.params?.requestId))?.abort();
-    return null;
-  }
-  if (request.id === undefined || request.id === null) return null;
-  if (request.method === 'initialize') {
-    return response(request.id, {
-      protocolVersion: '2024-11-05',
-      capabilities: { tools: {} },
-      serverInfo: { name: 'engineering-checklists', version: '1.2.0' },
-    });
-  }
-  if (request.method === 'tools/list') {
-    return response(request.id, { tools: TOOLS });
-  }
-  if (request.method !== 'tools/call') return failure(request.id, -32601, `Method not found: ${request.method}`);
-  const name = request.params?.name;
-  if (!TOOLS.some(t => t.name === name)) return failure(request.id, -32602, `Unknown tool: ${name || ''}`);
-  const args = request.params.arguments || {};
-  let result;
-  if (name === TOOL.name) {
-    result = prepareChecklist({ task: args.task, repoPath: args.repo_path, intent: args.intent || 'auto', ...args });
-  } else if ((name === AGENT_RUN_START_TOOL.name || name === AGENT_RUN_WAIT_TOOL.name) && !runnerConfig) {
-    result = runnerMissingError(name);
-  } else {
-    const controller = new AbortController();
-    pending.set(String(request.id), controller);
-    try {
-      result = name === CI_WAIT_TOOL.name ? await wait(args, { signal: controller.signal })
-        : name === AGENT_RUN_START_TOOL.name ? await startRun(args, { ...runnerConfig, signal: controller.signal })
-          : await waitRun(args, { ...runnerConfig, signal: controller.signal });
-    } finally {
-      pending.delete(String(request.id));
-    }
-  }
-  return response(request.id, {
-    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-    isError: !result.ok,
-  });
-}
+  return {
+    id: PROVIDER_ID,
+    serverInfo: SERVER_INFO,
+    pending,
+    listTools: () => TOOLS,
 
-if (require.main === module) {
-  const input = readline.createInterface({ input: process.stdin, terminal: false });
-  const pending = new Map();
-  input.on('line', line => {
-    let request;
-    try {
-      request = JSON.parse(line);
-    } catch {
-      return;
-    }
-    Promise.resolve(handleRequest(request, { pending })).then(result => {
-      if (result) process.stdout.write(`${JSON.stringify(result)}\n`);
-    }).catch(error => {
-      if (request.id !== undefined && request.id !== null) {
-        process.stdout.write(`${JSON.stringify(failure(request.id, -32603, error.message || 'Internal error'))}\n`);
+    async callTool(name, args = {}, { signal, requestId } = {}) {
+      const config = resolveRunnerConfig();
+      let result;
+
+      if (name === TOOL.name) {
+        result = prepareChecklist({ task: args.task, repoPath: args.repo_path, intent: args.intent || 'auto', ...args });
+      } else if ((name === AGENT_RUN_START_TOOL.name || name === AGENT_RUN_WAIT_TOOL.name) && !config) {
+        result = runnerMissingError(name);
+      } else {
+        const controller = new AbortController();
+        if (signal) {
+          if (signal.aborted) controller.abort();
+          else signal.addEventListener('abort', () => controller.abort(), { once: true });
+        }
+        // The pending call is keyed by the id of the request that started it:
+        // that is the id a notifications/cancelled message names.
+        pending.set(String(requestId), controller);
+        try {
+          result = name === CI_WAIT_TOOL.name
+            ? await wait(args, { signal: controller.signal })
+            : name === AGENT_RUN_START_TOOL.name
+              ? await startRun(args, { ...config, signal: controller.signal })
+              : await waitRun(args, { ...config, signal: controller.signal });
+        } finally {
+          pending.delete(String(requestId));
+        }
       }
-    });
-  });
-  process.stdin.resume();
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        isError: !result.ok,
+      };
+    },
+  };
 }
 
-module.exports = { TOOL, CI_WAIT_TOOL, AGENT_RUN_START_TOOL, AGENT_RUN_WAIT_TOOL, TOOLS, handleRequest };
+// The handlers of the provider as an MCP server: they answer the method names
+// of the protocol, the provider answers the tools.
+function providerHandlers(provider, { serverInfo = provider.serverInfo } = {}) {
+  return {
+    initialize: () => initializeResult({ name: serverInfo.name, version: serverInfo.version }),
+    'tools/list': () => ({ tools: provider.listTools() }),
+    'tools/call': async (params, message) => {
+      const name = params && params.name;
+      if (!provider.listTools().some(tool => tool.name === name)) {
+        throw new jsonrpc.JsonRpcError(jsonrpc.RPC_ERROR_CODES.invalidParams, `Unknown tool: ${name || ''}`);
+      }
+      return provider.callTool(name, (params && params.arguments) || {}, { requestId: message && message.id });
+    },
+  };
+}
+
+// The cancellation bridge: a notification cancels the call it names.
+function cancellationHandler(provider) {
+  return message => {
+    if (message.method !== 'notifications/cancelled') return;
+    const requestId = message.params && message.params.requestId;
+    provider.pending.get(String(requestId))?.abort();
+  };
+}
+
+/**
+ * Handle one MCP request against the checklist provider.
+ *
+ * Kept as the public entry of the provider: the tests and the standalone view
+ * of this surface call it directly, and it goes through the SAME transport as
+ * the merged entry point — there is no second implementation of the frame.
+ */
+function handleRequest(request, deps = {}) {
+  const provider = createChecklistsProvider(deps);
+  const transport = createTransport({
+    handlers: providerHandlers(provider),
+    onNotification: cancellationHandler(provider),
+  });
+  return transport.handle(request);
+}
+
+module.exports = {
+  PROVIDER_ID,
+  SERVER_INFO,
+  TOOL,
+  CI_WAIT_TOOL,
+  AGENT_RUN_START_TOOL,
+  AGENT_RUN_WAIT_TOOL,
+  TOOLS,
+  createChecklistsProvider,
+  providerHandlers,
+  cancellationHandler,
+  handleRequest,
+};

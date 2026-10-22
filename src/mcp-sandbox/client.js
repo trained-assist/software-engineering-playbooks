@@ -10,7 +10,7 @@
 // здесь же — иначе сравнивались бы два разных представления одного результата.
 
 const { spawn } = require('child_process');
-const jsonrpc = require('./transports/jsonrpc');
+const jsonrpc = require('../mcp-protocol');
 
 function stableStringify(value) {
   if (value === null || value === undefined) return 'null';

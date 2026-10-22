@@ -12,7 +12,8 @@
 //     server, mounted by trained-assist-agent as the `engineering` sibling).
 //
 //   checklists-provider-manifest.json → the `engineering-checklists` provider.
-//     Source of truth: src/mcp-checklists/index.js (the local, opt-in server).
+//     Source of truth: src/mcp-skills/providers/checklists.js (the checklist
+//     surface, served by the single entry point as an opt-in provider).
 //     It has its OWN providerId on purpose: the checklist surface is user-local
 //     and opt-in, and merging it into the `engineering` provider would widen
 //     the catalog trained-assist-agent registers for every host.
@@ -24,7 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const registry = require('../src/mcp-skills/registry');
-const checklists = require('../src/mcp-checklists/index');
+const checklists = require('../src/mcp-skills/providers/checklists');
 
 const ROOT = path.join(__dirname, '..');
 const errors = [];

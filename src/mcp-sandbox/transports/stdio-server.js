@@ -16,17 +16,41 @@
 //
 // stdout — только протокол. Всё остальное (готовность, вызовы, отказы) пишется в
 // stderr одной JSON-строкой на событие: stdout засорять нельзя, иначе кадр ломается.
+//
+// Кадр (JSON-RPC по stdio) — общий для всей репозитории: src/mcp-protocol. Здесь
+// своя только семантика песочницы: доверенный envelope, область видимости
+// инструментов и отказы домена.
 
 const { createSandboxDomainHost } = require('../index');
 const { readTrustedEnv, bindingStatus, hasExpiredOrMissingBinding } = require('./trusted-env');
 const { createToolSurface } = require('./tool-surface');
-const jsonrpc = require('./jsonrpc');
+const { createTransport, jsonrpc, serveStdio } = require('../../mcp-protocol');
 
 const MCP_PROTOCOL_VERSION = '2025-06-18';
 const SERVICE_NAME = 'software-engineering-playbooks-sandbox';
 
 function stderrLine(event, fields) {
   process.stderr.write(`${JSON.stringify({ at: new Date().toISOString(), event, ...fields })}\n`);
+}
+
+// Отказ песочницы: свой словарь кодов (TOOL_NOT_IN_SCOPE и коды домена), общий
+// с тем, что ждёт клиент.
+function sandboxOnError(id, error) {
+  if (error instanceof jsonrpc.JsonRpcError) {
+    return jsonrpc.errorResponse(id, error.code, error.message, error.data);
+  }
+  if (error && error.code === 'TOOL_NOT_IN_SCOPE') {
+    const details = error.details || {};
+    return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.toolNotInScope, error.message, {
+      code: 'TOOL_NOT_IN_SCOPE',
+      ...(details.tool ? { tool: details.tool } : {}),
+    });
+  }
+  if (error && error.code) {
+    // Отказ хоста до handler'а: наружу — тот же код, что в логе (P13).
+    return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.invalidParams, error.message, { code: error.code });
+  }
+  return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.internalError, 'internal error', { code: 'INTERNAL_ERROR' });
 }
 
 function createStdioMcpServer({ trusted, env, host, surface, log } = {}) {
@@ -53,19 +77,15 @@ function createStdioMcpServer({ trusted, env, host, surface, log } = {}) {
     return null;
   })();
 
-  function handle(message) {
-    if (jsonrpc.isNotification(message)) {
-      if (message.method === 'notifications/initialized') return null;
-      return null;
-    }
-    if (!jsonrpc.isRequest(message)) return null;
-
-    const { id, method, params } = message;
-
-    if (method === 'initialize') {
+  const handlers = {
+    initialize: () => {
       if (startupFailure) {
         stderrLine('mcp.server_start_failed', { reason: 'binding_not_usable', code: startupFailure.code, bindingRef: startupFailure.bindingRef });
-        return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.mcpStartupFailed, `mcp server cannot start: ${startupFailure.code}`, { code: startupFailure.code, bindingRef: startupFailure.bindingRef });
+        throw new jsonrpc.JsonRpcError(
+          jsonrpc.RPC_ERROR_CODES.mcpStartupFailed,
+          `mcp server cannot start: ${startupFailure.code}`,
+          { code: startupFailure.code, bindingRef: startupFailure.bindingRef },
+        );
       }
       stderrLine('mcp.server_ready', {
         protocolVersion: MCP_PROTOCOL_VERSION,
@@ -74,95 +94,66 @@ function createStdioMcpServer({ trusted, env, host, surface, log } = {}) {
         bindingRefs: (resolvedTrusted.bindings || []).map(binding => binding.ref),
         isolation: 'same_service_uid_not_os_isolated',
       });
-      return jsonrpc.resultResponse(id, {
+      return {
         protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: SERVICE_NAME, version: '1.0.0' },
-      });
-    }
+      };
+    },
 
-    if (method === 'ping') return jsonrpc.resultResponse(id, { ok: true });
+    ping: () => ({ ok: true }),
 
-    if (method === 'tools/list') {
-      return jsonrpc.resultResponse(id, { tools: resolvedSurface.listTools() });
-    }
+    'tools/list': () => ({ tools: resolvedSurface.listTools() }),
 
-    if (method === 'tools/call') {
+    'tools/call': async params => {
       const name = params && params.name;
       const args = (params && params.arguments) || {};
       if (typeof name !== 'string' || !resolvedSurface.has(name)) {
-        return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.toolNotInScope, `tool "${name}" is not in the allowed tools of this run`, { code: 'TOOL_NOT_IN_SCOPE', tool: name });
+        throw new jsonrpc.JsonRpcError(
+          jsonrpc.RPC_ERROR_CODES.toolNotInScope,
+          `tool "${name}" is not in the allowed tools of this run`,
+          { code: 'TOOL_NOT_IN_SCOPE', tool: name },
+        );
       }
-      return resolvedSurface.callTool(name, args)
-        .then(outcome => {
-          stderrLine('mcp.tool_result', {
-            tool: name,
-            outcome: outcome.kind,
-            profileId: resolvedTrusted.profileId,
-            operationId: resolvedTrusted.operationId,
-            replyChannel: resolvedTrusted.replyContext ? resolvedTrusted.replyContext.channel : null,
-            ...(outcome.effectReceipt ? { effectReceiptId: outcome.effectReceipt.receiptId } : {}),
-            ...(outcome.result && outcome.result.delivery ? { callbackDelivery: outcome.result.delivery } : {}),
-          });
-          return jsonrpc.resultResponse(id, {
-            content: [{ type: 'text', text: JSON.stringify(outcome) }],
-            structuredContent: outcome,
-          });
-        })
-        .catch(error => {
-          if (error && error.code === 'TOOL_NOT_IN_SCOPE') {
-            return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.toolNotInScope, error.message, { code: error.code, tool: name });
-          }
-          if (error && error.code) {
-            // Отказ хоста до handler'а: наружу — тот же код, что в логе (P13).
-            return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.invalidParams, error.message, { code: error.code });
-          }
-          return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.internalError, 'internal error', { code: 'INTERNAL_ERROR' });
-        });
-    }
+      const outcome = await resolvedSurface.callTool(name, args);
+      stderrLine('mcp.tool_result', {
+        tool: name,
+        outcome: outcome.kind,
+        profileId: resolvedTrusted.profileId,
+        operationId: resolvedTrusted.operationId,
+        replyChannel: resolvedTrusted.replyContext ? resolvedTrusted.replyContext.channel : null,
+        ...(outcome.effectReceipt ? { effectReceiptId: outcome.effectReceipt.receiptId } : {}),
+        ...(outcome.result && outcome.result.delivery ? { callbackDelivery: outcome.result.delivery } : {}),
+      });
+      return {
+        content: [{ type: 'text', text: JSON.stringify(outcome) }],
+        structuredContent: outcome,
+      };
+    },
+  };
 
-    return jsonrpc.errorResponse(id, jsonrpc.RPC_ERROR_CODES.methodNotFound, `method "${method}" not found`, { code: 'METHOD_NOT_FOUND', method });
-  }
+  const transport = createTransport({ handlers, onError: sandboxOnError });
 
-  return { handle, trusted: resolvedTrusted, host: resolvedHost, surface: resolvedSurface, startupFailure };
+  return {
+    handle: message => transport.handle(message),
+    handlers,
+    trusted: resolvedTrusted,
+    host: resolvedHost,
+    surface: resolvedSurface,
+    startupFailure,
+  };
 }
 
 /** Точка входа дочернего процесса: читает stdin, отвечает по stdout, умирает по EOF. */
 function run() {
   const server = createStdioMcpServer();
-  let buffer = '';
-
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', async chunk => {
-    buffer += chunk;
-    let index;
-    while ((index = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, index);
-      buffer = buffer.slice(index + 1);
-      if (line.trim().length === 0) continue;
-      let message;
-      try {
-        message = jsonrpc.decodeLine(line);
-      } catch (e) {
-        process.stdout.write(jsonrpc.encode(jsonrpc.errorResponse(null, e.code, e.message)));
-        continue;
-      }
-      try {
-        const response = await server.handle(message);
-        if (response) process.stdout.write(jsonrpc.encode(response));
-      } catch (e) {
-        process.stdout.write(jsonrpc.encode(jsonrpc.errorResponse(null, jsonrpc.RPC_ERROR_CODES.internalError, 'internal error', { code: 'INTERNAL_ERROR' })));
-      }
-    }
+  serveStdio({
+    handlers: server.handlers,
+    onError: sandboxOnError,
+    onEnd: () => stderrLine('mcp.server_cleanup', { signal: 'stdin_closed', outcome: 'exited' }),
   });
-
-  process.stdin.on('end', () => {
-    stderrLine('mcp.server_cleanup', { signal: 'stdin_closed', outcome: 'exited' });
-    process.exit(0);
-  });
-  process.stdin.on('error', () => process.exit(0));
 }
 
-module.exports = { createStdioMcpServer, run, MCP_PROTOCOL_VERSION, SERVICE_NAME, hasExpiredOrMissingBinding };
+module.exports = { createStdioMcpServer, run, MCP_PROTOCOL_VERSION, SERVICE_NAME, hasExpiredOrMissingBinding, sandboxOnError };
 
 if (require.main === module) run();
