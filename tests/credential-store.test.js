@@ -21,6 +21,9 @@ process.env.USER_ID = 'eng-user';
 delete process.env.GH_TOKEN;      // the file must be the only source here
 delete process.env.GITHUB_TOKEN;
 delete process.env.CRED_ENCRYPTION_KEY;
+// The `gh auth token` fallback (a real token on a dev host) would satisfy the
+// token reader and hide what these cases are about: the FILE is the source.
+process.env.ENGINEERING_GITHUB_DISABLE_GH_FALLBACK = '1';
 
 const store = require('../src/credential-store');
 const github = require('../src/mcp-skills/tools/60-github');
@@ -114,7 +117,10 @@ test('a base64 stub is never returned as the token', (t) => {
     /CRED_ENCRYPTION_KEY/, 'store-level: loud, no base64 garbage');
   const { warnings } = captureWarn(() => {
     assert.throws(() => github.getToken(), /GitHub токен не задан/, '60-github degrades to "no token"');
-    assert.throws(() => dev.getToken(), /GitHub токен не подключён/, '61-dev degrades to "no token"');
+    // 61-dev reads the same token as 60-github now (one reader for the whole
+    // provider) — the message must match, or the catalog answers differently
+    // depending on which module was asked.
+    assert.throws(() => dev.getToken(), /GitHub токен не задан/, '61-dev degrades to "no token"');
   });
   assert.ok(warnings.some(w => /cannot read the token file/.test(w)),
     `expected a loud warning, got: ${warnings.join(' | ')}`);

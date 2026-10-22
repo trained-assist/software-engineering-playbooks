@@ -7,12 +7,13 @@
 // registry.js. The heavy lifting lives in src/github/pr-status-core.js; this
 // file is only the schema + the throwing/non-throwing boundary.
 
-const { hasToken } = require('../../github/client');
+const { hasToken, missingTokenMessage } = require('../../github/client');
 const { prStatus, issueStatus } = require('../../github/pr-status-core');
 
 module.exports = {
   isReady: hasToken,
   setupTools: [],
+  notReadyError: () => missingTokenMessage(),
 
   tools: {
 

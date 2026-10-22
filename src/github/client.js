@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { readTokenValue } = require('../token-value');
 const { tokensRoot } = require('../data-paths');
 // Credential store (trained-assist-agent#1939): legacy plaintext passes through,
@@ -36,11 +37,62 @@ function tokenFilePath() {
   return USER_ID ? path.join(tokensRoot(), USER_ID, 'github') : null;
 }
 
+// The `gh` CLI already holds an authenticated token in the OS keyring. Reusing it
+// means the MCP server works on a host that has `gh auth login` but no
+// agent-tokens/<user>/github file (the common local setup). Never throws.
+//
+// Cached per process: `gh auth token` shells out, and this is called on every
+// registry load and on every hasToken() check.
+let ghCliTokenCache;
+function ghCliToken() {
+  // The opt-out wins over the cache: a process that disabled the fallback must
+  // keep seeing "no token", even if the cache was filled before the flag was set.
+  if (process.env.ENGINEERING_GITHUB_DISABLE_GH_FALLBACK === '1') return null;
+  if (ghCliTokenCache !== undefined) return ghCliTokenCache;
+  ghCliTokenCache = null;
+  try {
+    const out = execFileSync('gh', ['auth', 'token'], {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const t = String(out || '').trim();
+    ghCliTokenCache = t || null;
+  } catch (e) {
+    ghCliTokenCache = null;
+  }
+  return ghCliTokenCache;
+}
+
 function hasToken() {
   if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
   const p = tokenFilePath();
-  if (!p) return false;
-  try { return fs.existsSync(p); } catch { return false; }
+  if (p) {
+    try { if (fs.existsSync(p)) return true; } catch { /* fall through */ }
+  }
+  return !!ghCliToken();
+}
+
+// Where a token can come from, and what to do when there is none. Used by the
+// registry to answer a gated tool call with an actionable message instead of
+// letting the tool silently disappear from tools/list.
+function tokenSources() {
+  const sources = [];
+  if (process.env.GH_TOKEN) sources.push('GH_TOKEN');
+  if (process.env.GITHUB_TOKEN) sources.push('GITHUB_TOKEN');
+  const p = tokenFilePath();
+  if (p) sources.push(p);
+  if (ghCliToken()) sources.push('gh auth token');
+  return sources;
+}
+
+function missingTokenMessage() {
+  const seen = tokenSources();
+  const where = seen.length ? seen.join(', ') : 'ни один источник';
+  return `Нет GitHub-токена (проверено: ${where}). Токен нужен этому инструменту. ` +
+    'Варианты: 1) запиши PAT в ' + (tokenFilePath() || '~/agent-tokens/<user>/github') + '; ' +
+    '2) выполни `gh auth login` (сервер возьмёт токен из gh CLI); ' +
+    '3) установи GH_TOKEN в окружении MCP-сервера.';
 }
 
 function getToken() {
@@ -56,6 +108,8 @@ function getToken() {
       if (e && e.code !== 'ENOENT') console.warn('[github] cannot read the token file: %s', e.message);
     }
   }
+  const fromGh = ghCliToken();
+  if (fromGh) return fromGh;
   throw new GitHubApiError(
     'GitHub токен не задан. Вызови github_connect — получишь защищённую ссылку для ввода токена без отправки в чат.',
     null,
@@ -161,6 +215,9 @@ module.exports = {
   GitHubApiError,
   hasToken,
   getToken,
+  tokenFilePath,
+  tokenSources,
+  missingTokenMessage,
   ghFetch,
   ghText,
   ghGraphql,
