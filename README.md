@@ -804,6 +804,17 @@ Engineering capabilities should plug into that mechanism rather than introducing
 | `provider-manifest.json` | this repo | the provider's own richer manifest (v3, adds `contextFields` / `connections`) |
 | `action-provider-manifest.json` | **`trained-assist-agent`** | what the core action/cron registry actually registers (`src/skill-siblings.js` `actionManifestPath`, `scripts/check-skill-schedule.js`, `scripts/deploy.sh`) |
 
+There is one more manifest for the **local, opt-in** checklist server:
+
+| File | Owner / consumer | What it is |
+|---|---|---|
+| `checklists-provider-manifest.json` | this repo | the `engineering-checklists` provider manifest: `engineering_checklist_prepare`, `engineering_ci_wait`, `agent_run_start`, `agent_run_wait`. It keeps its own `providerId` on purpose — the checklist surface is user-local and opt-in, and folding it into the `engineering` provider would widen the catalog `trained-assist-agent` registers for every host |
+
+`npm run manifest:check` validates **both** manifests against the live tool
+registries: every action must map to a real MCP tool, the required inputs must
+match the tool's own schema, and a tool name may not be exposed by two providers
+at once (a duplicate name in one agent context is silent shadowing).
+
 `action-provider-manifest.json` is **generated** from `provider-manifest.json` by
 `npm run build:action-manifest` (CI fails if it is stale: `npm run check:action-manifest`).
 Do not hand-edit it — edit `provider-manifest.json` and rebuild. The projection is
