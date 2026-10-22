@@ -4,7 +4,7 @@ This document describes the local OpenCode/MCP integration for launching remote 
 
 ## Existing implementation
 
-The local OpenCode MCP server is `src/mcp-checklists/index.js`. OpenCode starts it as a local stdio process. Without runner credentials it exposes two tools:
+The local OpenCode MCP server is `src/mcp-skills/index.js` — the single entry point of this repository. The checklist surface (`engineering_checklist_prepare`, `engineering_ci_wait`, `agent_run_start`, `agent_run_wait`) is a provider of it and is opt-in: the entry point serves it when `ENGINEERING_MCP_PROVIDERS=engineering,checklists` (or `--providers=engineering,checklists`) says so. OpenCode starts it as a local stdio process. Without runner credentials it exposes two tools:
 
 - `engineering_checklist_prepare`: inspect a local repository and return a short adaptable task checklist.
 - `engineering_ci_wait`: wait for GitHub Actions/checks and return their final state.
@@ -105,11 +105,11 @@ Do not require a public callback URL or expose a webhook receiver just to wake a
 
 ## OpenCode/MCP wiring
 
-The tools live in `src/mcp-checklists/index.js`; the API client and waiter live in `src/serverless-agent/run.js`. Configure the existing local stdio MCP entry with a 90-minute tool timeout; `agent_run_wait` permits at most 80 minutes per call. Its default is 15 minutes. A timeout returns `pending` and the same `run_id` for another call. The terminal report includes the final answer or failure summary, artifact metadata and download links, and an events endpoint for the work history. The result arrives as ordinary MCP text content, which resumes the calling OpenCode agent. Cancelling the MCP request aborts the local HTTP wait, not the remote run.
+The tools live in `src/mcp-skills/providers/checklists.js`; the API client and waiter live in `src/serverless-agent/run.js`. Configure the existing local stdio MCP entry with a 90-minute tool timeout; `agent_run_wait` permits at most 80 minutes per call. Its default is 15 minutes. A timeout returns `pending` and the same `run_id` for another call. The terminal report includes the final answer or failure summary, artifact metadata and download links, and an events endpoint for the work history. The result arrives as ordinary MCP text content, which resumes the calling OpenCode agent. Cancelling the MCP request aborts the local HTTP wait, not the remote run.
 
 Set `SERVERLESS_AGENT_API_URL` to the provisioned HTTPS API origin and `SERVERLESS_AGENT_API_KEY` to a scoped developer key in the MCP process environment. Do not put either in the task prompt or MCP tool arguments. Both variables are required for discovery; existing checklist and CI tools work unchanged without them. A registered BYOK connection can be selected by `connection_id`; omit it to use the managed model. `timeout_seconds` on start controls remote execution (default 300 seconds, maximum 3600); `timeout_seconds` on wait controls local waiting (default 900 seconds, maximum 4800).
 
-For the current local OpenCode installation, `~/.config/opencode/opencode.json` sets the sandbox API origin in the `engineering-checklists` MCP `environment` and reads the key with `{file:/Users/vova/.config/opencode/secrets/serverless-agent-api-key}`. The key is stored in a mode-`0600` file and is not part of this repository. Runner PR #341 was merged and deployed to sandbox3 by [workflow run 38740334184](https://github.com/trained-assist/ai-agent-runner/actions/runs/38740334184). `node scripts/setup-developer-sandbox.mjs status` returned `200` with managed model access. Restart OpenCode after changing its global MCP configuration; all local sessions then see the same tools. The current Codex session has a separate tool registry and does not inherit OpenCode MCP registrations.
+For the current local OpenCode installation, `~/.config/opencode/opencode.json` sets the sandbox API origin in the `engineering-skills` MCP `environment` and reads the key with `{file:/Users/vova/.config/opencode/secrets/serverless-agent-api-key}`. The key is stored in a mode-`0600` file and is not part of this repository. Runner PR #341 was merged and deployed to sandbox3 by [workflow run 38740334184](https://github.com/trained-assist/ai-agent-runner/actions/runs/38740334184). `node scripts/setup-developer-sandbox.mjs status` returned `200` with managed model access. Restart OpenCode after changing its global MCP configuration; all local sessions then see the same tools. The current Codex session has a separate tool registry and does not inherit OpenCode MCP registrations.
 
 An earlier developer API canary returned terminal `succeeded` and an `__runner/agent-history.json` artifact. Authenticated download returned `200`, 11,103 bytes, and SHA-256 `357247519fc724fa4ae4e533a56823ebd92309bf7a851fcbe1f4d99b2c7ff19f`, matching the result manifest; the JSON had schema version 1 and `truncated: false`.
 
@@ -141,7 +141,7 @@ Use a fake runner API in unit tests and a disposable real run for end-to-end ver
 
 ## Current implementation locations
 
-- MCP server and tool schemas: `src/mcp-checklists/index.js`
+- MCP server and tool schemas: `src/mcp-skills/providers/checklists.js`
 - Serverless API client and waiter: `src/serverless-agent/run.js`
 - Serverless integration tests: `tests/serverless-agent-run.test.js`
 - GitHub wait/polling implementation: `src/github/ci-wait.js`

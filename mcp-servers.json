@@ -1,34 +1,24 @@
 {
-  "version": 1,
-  "description": "The declared MCP server composition of this stack. `npm run check:mcp-servers` validates this declaration against the servers this repository ships; with --host-config it also compares it with what the host actually runs (same servers, same commands, pinned revisions, no duplicate tool names).",
+  "version": 2,
+  "description": "The declared MCP server composition of this stack. `npm run check:mcp-servers` validates this declaration against the servers this repository ships; with --host-config it also compares it with what the host actually runs (same servers, same commands, pinned revisions, same providers, no duplicate tool names).",
   "servers": {
     "engineering-skills": {
       "type": "local",
-      "providerId": "engineering",
-      "role": "The engineering provider: GitHub, workspace, repo/change/verify and spec tools. This repository's main MCP surface.",
+      "role": "The single entry point of this repository's MCP surface: the engineering provider (GitHub, workspace, repo/change/verify and spec tools) plus the opt-in checklist surface (checklist preparation, bounded CI wait, remote serverless-agent runner). One process, one protocol layer, one catalog.",
       "enabled": true,
+      "providers": [
+        { "id": "engineering", "providerId": "engineering", "toolCount": 49 },
+        { "id": "checklists", "providerId": "engineering-checklists", "toolCount": 4 }
+      ],
       "source": {
         "repository": "trained-assist/software-engineering-playbooks",
-        "ref": "mcp-stack-v1",
+        "ref": "mcp-stack-v2",
         "entrypoint": "src/mcp-skills/index.js"
       },
-      "expectedToolCount": 49
-    },
-    "engineering-checklists": {
-      "type": "local",
-      "providerId": "engineering-checklists",
-      "role": "The local, opt-in checklist surface: checklist preparation, bounded CI wait and the remote serverless-agent runner.",
-      "enabled": true,
-      "source": {
-        "repository": "trained-assist/software-engineering-playbooks",
-        "ref": "mcp-stack-v1",
-        "entrypoint": "src/mcp-checklists/index.js"
-      },
-      "expectedToolCount": 4
+      "expectedToolCount": 53
     },
     "search-skills": {
       "type": "local",
-      "providerId": null,
       "role": "Web search: free (keyless) SERP and Serper. The canonical search server — the `trained` remote publishes the same tool names and would shadow them.",
       "enabled": true,
       "source": {
@@ -40,7 +30,6 @@
     },
     "web-navigation": {
       "type": "local",
-      "providerId": null,
       "role": "Reading side of the browser stack: open (with Cloudflare/JS-challenge handling), find, state, text, ask, screenshot.",
       "enabled": true,
       "source": {
@@ -52,7 +41,6 @@
     },
     "safe-playwright": {
       "type": "local",
-      "providerId": null,
       "role": "Interaction side of the browser stack: live UI actions (navigate, snapshot, click, type, wait, login) with credentials filled from the audited store instead of the model context.",
       "enabled": true,
       "source": {
@@ -64,7 +52,6 @@
     },
     "zerocreds": {
       "type": "local",
-      "providerId": null,
       "role": "The credential store: connections, credentials, forms and the audit trail behind every other server.",
       "enabled": true,
       "source": {
@@ -76,7 +63,6 @@
     },
     "js-ts-code": {
       "type": "local",
-      "providerId": null,
       "role": "JavaScript/TypeScript code writer with syntax validation and type checking.",
       "enabled": true,
       "source": {
@@ -88,7 +74,6 @@
     },
     "cloudflare": {
       "type": "remote",
-      "providerId": null,
       "role": "Cloudflare API access: Workers, R2, D1, DNS, Zero Trust.",
       "enabled": true,
       "source": {
@@ -98,7 +83,6 @@
     },
     "trained": {
       "type": "remote",
-      "providerId": null,
       "role": "Integration-test harness of the MCP host (profile integration-telegram-ux-v1). Disabled: it publishes search_serp_free and search_serper — the same names as search-skills — so one of the two is picked by start order, not by intent.",
       "enabled": false,
       "source": {

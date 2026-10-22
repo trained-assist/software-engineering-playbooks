@@ -12,26 +12,49 @@ For debugging, the checklist starts with repository/worktree and baseline discov
 
 ## Local opt-in MCP
 
+The checklist surface is a **provider** of the single MCP entry point of this
+repository (`src/mcp-skills/index.js`), and it is opt-in: the entry point serves
+it only when it is asked to.
+
 Run the server directly with Node 22 or newer:
 
 ```sh
-node /absolute/path/to/software-engineering-playbooks/src/mcp-checklists/index.js
+ENGINEERING_MCP_PROVIDERS=engineering,checklists \
+  node /absolute/path/to/software-engineering-playbooks/src/mcp-skills/index.js
 ```
 
-Add a local MCP entry to the user's OpenCode configuration (`~/.config/opencode/opencode.json`):
+`--providers=engineering,checklists` does the same thing and overrides the
+environment.
+
+Add a local MCP entry to the user's OpenCode configuration
+(`~/.config/opencode/opencode.json`):
 
 ```json
 {
   "mcp": {
-    "engineering-checklists": {
+    "engineering-skills": {
       "type": "local",
-      "command": ["node", "/absolute/path/to/software-engineering-playbooks/src/mcp-checklists/index.js"],
+      "command": ["/absolute/path/to/node", "/absolute/path/to/software-engineering-playbooks/src/mcp-skills/index.js"],
       "cwd": "/absolute/path/to/software-engineering-playbooks",
-      "enabled": true
+      "environment": {
+        "ENGINEERING_MCP_PROVIDERS": "engineering,checklists"
+      },
+      "disabled": false
     }
   }
 }
 ```
+
+Two details in that entry are not cosmetic:
+
+- **Use the absolute path of the node binary**, not the bare `node`. The host
+  starts the server with a minimal environment, where `node` is often not on
+  `PATH` — the server then fails to start and the whole MCP entry disappears
+  from the agent context without an error.
+- **Point the entry at a clean checkout at a pinned revision.** A working tree
+  with uncommitted changes is a running server that exists nowhere else and
+  cannot be reproduced. `npm run check:mcp-servers -- --host-config
+  ~/.config/opencode/opencode.json` verifies both.
 
 The `engineering_checklist_prepare` tool accepts the task and an absolute repository/worktree path. It reads shallow project metadata, package script names, selected config file names, and Git branch/change counts. It does not run project scripts, read environment file contents, modify files, or call external services. It returns checklists and capability evidence; the agent remains responsible for selecting relevant TODOs and running any explicitly appropriate project checks.
 

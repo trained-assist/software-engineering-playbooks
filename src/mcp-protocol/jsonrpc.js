@@ -1,24 +1,35 @@
 'use strict';
 
-// JSON-RPC 2.0 по stdio (newline-delimited JSON) — тот же кадр, что используют
-// MCP-серверы и что описан в P13 (ai-agent-runner src/mcp/jsonrpc.ts, PR #46).
-// Клиент и сервер песочницы делят этот модуль: расхождение кадра между сторонами
-// сделало бы проверку контракта бессмысленной.
+// JSON-RPC 2.0 over stdio (newline-delimited JSON) — the frame every MCP server
+// in this repository speaks, and the frame described in P13
+// (ai-agent-runner src/mcp/jsonrpc.ts, PR #46).
+//
+// This module used to live at src/mcp-sandbox/transports/jsonrpc.js and was
+// used by the sandbox client and the sandbox stdio server only. The other two
+// MCP servers of this repository each had their own hand-written copy of the
+// same frame, and they disagreed about details that matter: one answered
+// without the "jsonrpc" field, one answered a request that had no id, one
+// lost the answer of a cancelled request.
+//
+// Now there is ONE frame module for the whole stack, and the sandbox client
+// and the sandbox stdio server share it — a divergence of the frame between
+// the two sides would make the contract check meaningless.
 
 const JSONRPC_VERSION = '2.0';
 
-// Стандартные коды JSON-RPC + наши для транспортных отказов (те же имена, что в P13).
+// Standard JSON-RPC codes plus the transport failures of this stack (the same
+// names as in P13).
 const RPC_ERROR_CODES = {
   parseError: -32700,
   invalidRequest: -32600,
   methodNotFound: -32601,
   invalidParams: -32602,
   internalError: -32603,
-  /** Инструмент вне scoped bindings рана (приёмка AC-115: чужой binding недоступен). */
+  /** A tool outside the scoped bindings of the run (acceptance AC-115: a foreign binding is unreachable). */
   toolNotInScope: -32001,
-  /** Транспорт/таймаут на стороне MCP-сервера. */
+  /** Transport/timeout on the MCP server side. */
   transportTimeout: -32002,
-  /** Старт сервера не удался: binding не объявлен/просрочен (P13: MCP_STARTUP_FAILED). */
+  /** The server did not start: a binding is not declared/expired (P13: MCP_STARTUP_FAILED). */
   mcpStartupFailed: -32003,
 };
 

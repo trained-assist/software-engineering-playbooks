@@ -54,7 +54,7 @@ const {
 } = require(path.join(REPO, 'src', 'mcp-sandbox'));
 const { createStdioRpcClient, createHttpApiClient, outcomeFingerprint, extractOutcome } = require(path.join(REPO, 'src', 'mcp-sandbox', 'client.js'));
 const { createHttpApiServer, reserveLoopbackPort } = require(path.join(REPO, 'src', 'mcp-sandbox', 'transports', 'http-server.js'));
-const jsonrpc = require(path.join(REPO, 'src', 'mcp-sandbox', 'transports', 'jsonrpc.js'));
+const jsonrpc = require(path.join(REPO, 'src', 'mcp-protocol', 'index.js'));
 const { readEvents } = require(path.join(REPO, 'src', 'playbook-artifacts', 'events.js'));
 
 const STDIO_ENTRY = path.join(REPO, 'src', 'mcp-sandbox', 'transports', 'stdio-server.js');

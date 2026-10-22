@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { agentRunStart, agentRunWait } = require('../src/serverless-agent/run');
-const { handleRequest } = require('../src/mcp-checklists');
+const { handleRequest } = require('../src/mcp-skills/providers/checklists');
 
 const runId = `run_${'a'.repeat(64)}_${'b'.repeat(24)}`;
 const config = { baseUrl: 'https://runner.example', token: 'private-token' };

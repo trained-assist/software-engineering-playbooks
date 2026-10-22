@@ -15,23 +15,29 @@
 //      server start order, not on intent.
 //
 // The declaration (`mcp-servers.json`) says which servers compose the stack,
-// what each one is for, which repository and revision it runs, and how many
-// tools it publishes. The check compares that declaration with the host
-// configuration and with the catalogs the servers actually serve.
+// what each one is for, which repository and revision it runs, which providers
+// it serves and how many tools it publishes. The check compares that
+// declaration with the host configuration and with the catalogs the servers
+// actually serve.
 
 const fs = require('fs');
 const path = require('path');
 const { checkoutState, resolveRef, normalizeRepository } = require('./git');
-const { probeTools } = require('./probe');
+const { probeTools, resolveEnvironment } = require('./probe');
+const { PROVIDERS_ENV, DEFAULT_PROVIDERS, parseProviderIds } = require('../mcp-skills/providers');
 
 const THIS_REPOSITORY = 'trained-assist/software-engineering-playbooks';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
-// The tool lists of the servers this repository owns, counted in-process (no
-// spawn, no network) so the declaration can be checked anywhere.
-const OWNED_TOOL_SOURCES = {
-  'src/mcp-skills/index.js': () => require('../mcp-skills/registry').listTools().map(t => t.name),
-  'src/mcp-checklists/index.js': () => require('../mcp-checklists/index').TOOLS.map(t => t.name),
+// The entry points of this repository, counted in-process (no spawn, no
+// network) so the declaration can be checked anywhere.
+const OWNED_ENTRYPOINTS = {
+  'src/mcp-skills/index.js': {
+    tools: ids => {
+      const { buildProviders } = require('../mcp-skills/providers');
+      return buildProviders(ids).flatMap(provider => provider.listTools().map(tool => tool.name));
+    },
+  },
 };
 
 function isSha(value) {
@@ -48,6 +54,21 @@ function isRepository(value) {
 
 function hostServerDisabled(server) {
   return Boolean(server && server.disabled);
+}
+
+// The provider ids a declared server serves. A server that declares no
+// providers serves the default set.
+function declaredProviderIds(server) {
+  if (Array.isArray(server && server.providers) && server.providers.length) {
+    return server.providers.map(provider => provider.id);
+  }
+  return DEFAULT_PROVIDERS;
+}
+
+function sameSet(left, right) {
+  if (left.length !== right.length) return false;
+  const set = new Set(left);
+  return right.every(item => set.has(item));
 }
 
 // The path of the server script inside its checkout: the host starts
@@ -101,11 +122,30 @@ function validateDeclaration(declaration, { repoRoot }) {
     if (typeof server.enabled !== 'boolean') {
       errors.push(`${where} must declare enabled (true/false)`);
     }
-    if (server.providerId !== null && typeof server.providerId !== 'string') {
-      errors.push(`${where} providerId must be a string or null`);
-    }
     if (server.expectedToolCount !== null && typeof server.expectedToolCount !== 'number') {
       errors.push(`${where} expectedToolCount must be a number or null`);
+    }
+
+    if (server.providers !== undefined) {
+      if (!Array.isArray(server.providers) || server.providers.length === 0) {
+        errors.push(`${where} providers must be a non-empty array`);
+      } else {
+        for (const provider of server.providers) {
+          if (!provider || typeof provider !== 'object') {
+            errors.push(`${where} every provider must be an object`);
+            continue;
+          }
+          if (typeof provider.id !== 'string' || provider.id.length === 0) {
+            errors.push(`${where} every provider needs an id`);
+          }
+          if (provider.providerId !== null && typeof provider.providerId !== 'string') {
+            errors.push(`${where} provider "${provider.id}" providerId must be a string or null`);
+          }
+          if (typeof provider.toolCount !== 'number') {
+            errors.push(`${where} provider "${provider.id}" must declare toolCount`);
+          }
+        }
+      }
     }
 
     const source = server.source;
@@ -131,7 +171,7 @@ function validateDeclaration(declaration, { repoRoot }) {
     }
 
     if (source.repository === THIS_REPOSITORY && typeof source.entrypoint === 'string') {
-      const owned = OWNED_TOOL_SOURCES[source.entrypoint.replace(/^\.\//, '')];
+      const owned = OWNED_ENTRYPOINTS[source.entrypoint.replace(/^\.\//, '')];
       if (!owned) {
         errors.push(`${where} points at this repository but "${source.entrypoint}" is not a known server of it`);
       } else {
@@ -139,10 +179,34 @@ function validateDeclaration(declaration, { repoRoot }) {
         if (!fs.existsSync(entrypointPath)) {
           errors.push(`${where} entrypoint "${source.entrypoint}" does not exist in the checkout`);
         }
-        const tools = owned();
+        const ids = declaredProviderIds(server);
+        let tools = [];
+        try {
+          tools = owned.tools(ids);
+        } catch (error) {
+          errors.push(`${where} declares the providers ${ids.join(', ')}, which the entry point does not know: ${error.message}`);
+          continue;
+        }
         info.push(`${name}: ${tools.length} tools (this repository, counted in-process)`);
         if (typeof server.expectedToolCount === 'number' && server.expectedToolCount !== tools.length) {
           errors.push(`${where} declares expectedToolCount ${server.expectedToolCount}, but the server publishes ${tools.length}`);
+        }
+        for (const provider of Array.isArray(server.providers) ? server.providers : []) {
+          let names = [];
+          try {
+            names = owned.tools([provider.id]);
+          } catch {
+            errors.push(`${where} declares the provider "${provider.id}", which the entry point does not know`);
+            continue;
+          }
+          if (provider.toolCount !== names.length) {
+            errors.push(`${where} provider "${provider.id}" declares toolCount ${provider.toolCount}, but it publishes ${names.length}`);
+          }
+        }
+        const declaredSum = (Array.isArray(server.providers) ? server.providers : [])
+          .reduce((total, provider) => total + (typeof provider.toolCount === 'number' ? provider.toolCount : 0), 0);
+        if (Array.isArray(server.providers) && server.providers.length && declaredSum !== tools.length) {
+          errors.push(`${where} declares providers that add up to ${declaredSum} tools, but the server publishes ${tools.length}`);
         }
       }
     }
@@ -183,6 +247,18 @@ function compareHost(declaration, servers, hostConfig, { repoRoot }) {
         errors.push(`${where} runs "${host.url || 'nothing'}" but the declaration pins "${server.source.url}"`);
       }
       continue;
+    }
+
+    // The providers the server serves are part of the declaration: a server
+    // that serves another set publishes another catalog.
+    if (Array.isArray(server.providers) && server.providers.length) {
+      const declared = declaredProviderIds(server);
+      const environment = resolveEnvironment(host.environment);
+      const configured = parseProviderIds(environment[PROVIDERS_ENV]);
+      const effective = configured.length ? configured : DEFAULT_PROVIDERS;
+      if (!sameSet(effective, declared)) {
+        errors.push(`${where} serves the providers [${effective.join(', ')}], but the declaration says [${declared.join(', ')}]`);
+      }
     }
 
     const declaredEntrypoint = server.source.entrypoint.replace(/^\/+/, '');
@@ -229,9 +305,14 @@ function compareHost(declaration, servers, hostConfig, { repoRoot }) {
   return { errors, warnings, info };
 }
 
-// Two enabled servers that publish the same tool name: the agent sees one of
-// them, and which one depends on start order, not on intent.
-async function checkToolNameCollisions(servers, hostConfig, { probe = probeTools } = {}) {
+// The catalog the host really sees: the tools each enabled local server
+// publishes, read from the running server with the environment of the host.
+//
+// Two enabled servers that publish the same tool name are an error — the agent
+// sees one of them, and which one depends on start order, not on intent. A
+// catalog that does not match the declared count is an error too: the
+// declaration is then a description of a server that does not exist.
+async function checkLiveCatalog(servers, hostConfig, { probe = probeTools } = {}) {
   const errors = [];
   const warnings = [];
   const info = [];
@@ -242,12 +323,18 @@ async function checkToolNameCollisions(servers, hostConfig, { probe = probeTools
     if (!server.enabled || server.type !== 'local') continue;
     const host = hostServers[name];
     if (!host || hostServerDisabled(host)) continue;
-    const answer = await probe(host.command);
+    // The host environment, not the environment of the check: a server that
+    // changes its catalog with the environment publishes something else here
+    // than there.
+    const answer = await probe(host.command, { env: host.environment });
     if (!answer.ok) {
       warnings.push(`cannot read the tool list of "${name}": ${answer.error} — name collisions with it were not checked`);
       continue;
     }
     info.push(`${name}: ${answer.tools.length} tools published`);
+    if (typeof server.expectedToolCount === 'number' && server.expectedToolCount !== answer.tools.length) {
+      errors.push(`"${name}" publishes ${answer.tools.length} tools, but the declaration says ${server.expectedToolCount}`);
+    }
     for (const tool of answer.tools) {
       if (!owners.has(tool)) owners.set(tool, []);
       owners.get(tool).push(name);
@@ -277,13 +364,20 @@ async function checkComposition({ declaration, hostConfig, repoRoot, probe } = {
     errors.push(...comparison.errors);
     warnings.push(...comparison.warnings);
     info.push(...comparison.info);
-    const collisions = await checkToolNameCollisions(result.servers, hostConfig, { probe });
-    errors.push(...collisions.errors);
-    warnings.push(...collisions.warnings);
-    info.push(...collisions.info);
+    const live = await checkLiveCatalog(result.servers, hostConfig, { probe });
+    errors.push(...live.errors);
+    warnings.push(...live.warnings);
+    info.push(...live.info);
   }
 
   return { errors, warnings, info };
 }
 
-module.exports = { checkComposition, validateDeclaration, compareHost, checkToolNameCollisions, THIS_REPOSITORY };
+module.exports = {
+  checkComposition,
+  validateDeclaration,
+  compareHost,
+  checkLiveCatalog,
+  declaredProviderIds,
+  THIS_REPOSITORY,
+};

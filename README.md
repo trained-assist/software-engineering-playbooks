@@ -818,10 +818,10 @@ at once (a duplicate name in one agent context is silent shadowing).
 ## The MCP composition declaration
 
 `mcp-servers.json` says which MCP servers compose the stack, what each one is
-for, which repository and revision it runs, and how many tools it publishes.
-`npm run check:mcp-servers` validates that declaration; with
-`--host-config ~/.config/opencode/opencode.json` it also compares it with what
-the host actually runs:
+for, which repository and revision it runs, which providers it serves and how
+many tools it publishes. `npm run check:mcp-servers` validates that
+declaration; with `--host-config ~/.config/opencode/opencode.json` it also
+compares it with what the host actually runs:
 
 - a declared server may not disappear from the host, and a server that is not
   declared may not run there;
@@ -829,7 +829,31 @@ the host actually runs:
   repository at the pinned revision** — an uncommitted working tree is a running
   state that exists nowhere else and cannot be reproduced;
 - two enabled servers may not publish the same tool name: in one agent context
-  one of them shadows the other, chosen by start order rather than by intent.
+  one of them shadows the other, chosen by start order rather than by intent;
+- the catalog the host really sees — the servers are asked for their
+  `tools/list` **with the environment of the host** — must match the declared
+  tool count, and the providers a server serves must be the declared ones.
+
+## The MCP entry point
+
+There is **one** stdio entry point of this repository,
+`src/mcp-skills/index.js`, and **one** JSON-RPC frame,
+`src/mcp-protocol`. The frame used to be written three times — once per
+server — and the three copies disagreed about details that matter.
+
+The entry point serves *providers*:
+
+| Provider | Manifest | Tools | Served |
+|---|---|---|---|
+| `engineering` | `provider-manifest.json` | 49 | always |
+| `checklists` | `checklists-provider-manifest.json` | 4 | opt-in |
+
+The checklist surface is opt-in on purpose: it is user-local, and adding it to
+the default catalog would widen the surface every host of `trained-assist-agent`
+registers. The set is explicit — `ENGINEERING_MCP_PROVIDERS=engineering,checklists`
+(or `--providers=engineering,checklists`) — and the composition declaration
+says which set the host runs, so the catalog of the running server can never be
+something else than the declared one.
 
 `action-provider-manifest.json` is **generated** from `provider-manifest.json` by
 `npm run build:action-manifest` (CI fails if it is stale: `npm run check:action-manifest`).
