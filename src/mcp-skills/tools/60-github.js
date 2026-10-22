@@ -6,7 +6,7 @@
 //
 // Token setup: call connect({ service: "github" }) — universal connect tool handles ZeroCreds form.
 
-const { getToken, hasToken, ghFetch, ghText } = require('../../github/client');
+const { getToken, hasToken, ghFetch, ghText, missingTokenMessage } = require('../../github/client');
 const { prStatus } = require('../../github/pr-status-core');
 const GH_API = 'https://api.github.com';
 
@@ -16,6 +16,10 @@ module.exports = {
   getToken, hasToken, ghFetch, ghText,
   isReady: hasToken,
   setupTools: ['github_status'],
+  // Called when a gated tool is invoked without a token: the tool stays in
+  // tools/list (the catalog is deterministic) and the call explains what is
+  // missing instead of failing with "Unknown tool".
+  notReadyError: () => missingTokenMessage(),
 
   tools: {
 

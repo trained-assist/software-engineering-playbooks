@@ -90,7 +90,15 @@ test('MCP surface exposes checklist preparation and bounded CI wait tools', asyn
   write(root, 'package.json', '{"scripts":{"test":"node --test"}}');
 
   const listed = await handleRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
-  assert.deepEqual(listed.result.tools.map(tool => tool.name), ['engineering_checklist_prepare', 'engineering_ci_wait']);
+  // The catalog is complete and stable: the remote-runner tools are declared
+  // even when the runner is not configured, so "not wired up" is an explicit
+  // error and not a missing tool.
+  assert.deepEqual(listed.result.tools.map(tool => tool.name), [
+    'engineering_checklist_prepare',
+    'engineering_ci_wait',
+    'agent_run_start',
+    'agent_run_wait',
+  ]);
   assert.deepEqual(TOOL.inputSchema.required, ['task', 'repo_path']);
   assert.deepEqual(CI_WAIT_TOOL.inputSchema.required, ['repo']);
 
@@ -109,6 +117,18 @@ test('MCP surface exposes checklist preparation and bounded CI wait tools', asyn
     params: { name: CI_WAIT_TOOL.name, arguments: { repo: 'owner/repo', sha: 'abc', interval_seconds: 60 } },
   });
   assert.equal(JSON.parse(invalidWait.result.content[0].text).state, 'invalid_request');
+
+  // The remote-runner tools are declared even when the runner is not wired up:
+  // the call says exactly what is missing instead of failing with "Unknown tool".
+  const notConfigured = await handleRequest({
+    jsonrpc: '2.0', id: 5, method: 'tools/call',
+    params: { name: 'agent_run_start', arguments: { task: 'do it', idempotency_key: 'k1' } },
+  }, { runnerConfig: null });
+  const runnerResult = JSON.parse(notConfigured.result.content[0].text);
+  assert.equal(runnerResult.ok, false);
+  assert.equal(runnerResult.error, 'RUNNER_NOT_CONFIGURED');
+  assert.equal(runnerResult.tool, 'agent_run_start');
+  assert.match(runnerResult.message, /SERVERLESS_AGENT_API_URL/);
 });
 
 test('MCP cancellation interrupts the wait request so changed criteria can be submitted', async () => {

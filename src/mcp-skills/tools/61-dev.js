@@ -20,35 +20,16 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { readTokenValue } = require('../../token-value');
 const { spawnSync } = require('child_process');
 const { spawnWorkspaceForTask } = require('../../workspace');
-const { tokensRoot } = require('../../data-paths');
-// Credential store (trained-assist-agent#1939): legacy plaintext passes through,
-// an encrypted `github` file is decrypted — a raw readFileSync would hand back
-// base64 garbage once CRED_ENCRYPTION_KEY is provisioned.
-const { readCredentialFile } = require('../../credential-store');
-
-const USER_ID = process.env.USER_ID || '';
-
-function tokenPath() {
-  return path.join(tokensRoot(), USER_ID, 'github');
-}
+// One GitHub token reader for the whole provider (src/github/client.js). The
+// copy that used to live here drifted from 60-github's: it had no `gh auth
+// token` fallback and a different "no token" message, so the same host could
+// see a different tool catalog depending on which module answered.
+const { getToken: getClientToken, hasToken: clientHasToken, missingTokenMessage } = require('../../github/client');
 
 function getToken() {
-  const tok = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-  if (tok) return tok;
-  if (USER_ID) {
-    try {
-      const p = tokenPath();
-      if (fs.existsSync(p)) return readTokenValue(readCredentialFile(p));
-    } catch (e) {
-      // Encrypted file without CRED_ENCRYPTION_KEY (or an unreadable one):
-      // never fall back to the base64 stub — degrade to "no token", loudly.
-      if (e && e.code !== 'ENOENT') console.warn('[dev] cannot read the token file: %s', e.message);
-    }
-  }
-  throw new Error('GitHub токен не подключён. Вызови connect({ service: "github" }) чтобы получить ссылку для ввода токена.');
+  return getClientToken();
 }
 
 const GH_API = 'https://api.github.com';
@@ -220,12 +201,9 @@ module.exports = {
   spawnTaskWorkspace,
   prepareWorkspace,
   detectDependencies,
-  isReady: () => {
-    if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN) return true;
-    if (!USER_ID) return false;
-    return fs.existsSync(tokenPath());
-  },
+  isReady: () => clientHasToken(),
   setupTools: [],
+  notReadyError: () => missingTokenMessage(),
 
   tools: {
 

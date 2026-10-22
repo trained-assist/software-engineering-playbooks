@@ -13,6 +13,11 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 
+// The `gh auth token` fallback would satisfy the token reader on a dev host and
+// make the "no token" case unreachable. These tests are hermetic by contract:
+// the token comes from the stubbed env, never from the host.
+process.env.ENGINEERING_GITHUB_DISABLE_GH_FALLBACK = '1';
+
 test('templates/ci.yml is a manual test-run workflow that cannot ship anything', () => {
   const tpl = fs.readFileSync(path.join(ROOT, 'templates', 'ci.yml'), 'utf8');
   assert.match(tpl, /workflow_dispatch/, 'manual trigger declared');
