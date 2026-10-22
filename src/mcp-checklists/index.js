@@ -95,6 +95,12 @@ const AGENT_RUN_WAIT_TOOL = {
   },
 };
 
+// The complete tool surface of this provider, in the order it is served.
+// One list, so the wire format, the manifest check and the composition
+// declaration cannot drift apart (the names used to be repeated in three
+// places).
+const TOOLS = [TOOL, CI_WAIT_TOOL, AGENT_RUN_START_TOOL, AGENT_RUN_WAIT_TOOL];
+
 function response(id, result) {
   return { jsonrpc: '2.0', id, result };
 }
@@ -119,11 +125,11 @@ async function handleRequest(request, { pending = new Map(), wait = waitForCi,
     });
   }
   if (request.method === 'tools/list') {
-    return response(request.id, { tools: [TOOL, CI_WAIT_TOOL, AGENT_RUN_START_TOOL, AGENT_RUN_WAIT_TOOL] });
+    return response(request.id, { tools: TOOLS });
   }
   if (request.method !== 'tools/call') return failure(request.id, -32601, `Method not found: ${request.method}`);
   const name = request.params?.name;
-  if (![TOOL.name, CI_WAIT_TOOL.name, AGENT_RUN_START_TOOL.name, AGENT_RUN_WAIT_TOOL.name].includes(name)) return failure(request.id, -32602, `Unknown tool: ${name || ''}`);
+  if (!TOOLS.some(t => t.name === name)) return failure(request.id, -32602, `Unknown tool: ${name || ''}`);
   const args = request.params.arguments || {};
   let result;
   if (name === TOOL.name) {
@@ -168,4 +174,4 @@ if (require.main === module) {
   process.stdin.resume();
 }
 
-module.exports = { TOOL, CI_WAIT_TOOL, AGENT_RUN_START_TOOL, AGENT_RUN_WAIT_TOOL, handleRequest };
+module.exports = { TOOL, CI_WAIT_TOOL, AGENT_RUN_START_TOOL, AGENT_RUN_WAIT_TOOL, TOOLS, handleRequest };

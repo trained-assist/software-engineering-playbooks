@@ -48,11 +48,10 @@ function loadManifest(file) {
 }
 
 // The checklists server declares its tools as plain MCP definitions; they are
-// collected from the same constants the server serves, so the manifest cannot
+// collected from the same list the server serves, so the manifest cannot
 // drift from the wire format.
 function checklistsTools() {
-  return [checklists.TOOL, checklists.CI_WAIT_TOOL, checklists.AGENT_RUN_START_TOOL, checklists.AGENT_RUN_WAIT_TOOL]
-    .map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+  return checklists.TOOLS.map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
 }
 
 function validateManifest(manifest, file, toolByName, label) {
