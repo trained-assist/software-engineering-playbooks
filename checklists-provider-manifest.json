@@ -8,6 +8,7 @@
       "inputSchema": {
         "type": "object",
         "required": ["task", "repo_path"],
+        "additionalProperties": false,
         "properties": {
           "task": { "type": "string" },
           "repo_path": { "type": "string" },

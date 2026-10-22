@@ -114,39 +114,88 @@ function deliveryDisabledByTask(task) {
   return /\b(no\s+(pr|pull\s*request|branch|merge|deploy|ci)|no\s+\w+\s+(pr|pull\s*request|branch|merge|deploy|ci)|without\s+(pr|pull\s*request|branch|merge|deploy|ci)|skip\s+(pr|pull\s*request|branch|ci|merge|deploy)|direct(?:ly)?\s+(to|into|commit)|commit\s+directly|только\s+локально|без\s+(pr|pull\s*request|ветк|мерж|депло|ci)|не\s+(делай|нужен|нужно)\s+.*(pr|pull\s*request|ветк|мерж|депло|ci)|напрямую\s+в\s+(main|master))\b/i.test(text);
 }
 
-function resolveDelivery(task, options = {}) {
-  const candidates = [
-    options.delivery,
-    options.includeDelivery,
-    options.include_delivery,
-    options.defaultDelivery,
-    options.default_delivery,
-    options.pr,
-    options.pullRequest,
-    options.pull_request,
-    options.deliverable,
-    options.deliveryScope,
-    options.delivery_scope,
-    options.mode,
-    options.scope,
-  ];
-  for (const candidate of candidates) {
-    if (candidate === undefined || candidate === null) continue;
-    if (typeof candidate === 'boolean') return candidate;
-    if (typeof candidate === 'number') return candidate !== 0;
-    const value = String(candidate).trim().toLowerCase();
-    if (['false', 'none', 'disabled', 'no', 'off', '0', 'local', 'local-only', 'narrow'].includes(value)) return false;
-    if (value.includes('local') || value.includes('no-pr') || value.includes('no pr') || value.includes('narrow')) return false;
-    if (['true', 'default', 'enabled', 'yes', 'on', '1', 'full'].includes(value)) return true;
-  }
-  return !deliveryDisabledByTask(task);
+// ONE concept, ONE canonical name: `delivery`.
+//
+// The flag used to be spelled in thirteen ways while the tool schema (and the
+// provider manifest) declared only one of them, so a caller could not know
+// which name was meant — and two of them (`mode`, `scope`) were never
+// documented and were silently read as a delivery flag. A guess that quietly
+// changes the delivery path is worse than an explicit refusal, so:
+//
+//   - `delivery` is canonical;
+//   - the aliases below keep working, so nothing that works today breaks;
+//   - `mode` and `scope` are refused with the canonical name in the error.
+const DELIVERY_ALIASES = [
+  'include_delivery', 'includeDelivery',
+  'default_delivery', 'defaultDelivery',
+  'pull_request', 'pullRequest', 'pr',
+  'deliverable',
+  'delivery_scope', 'deliveryScope',
+];
+
+const AMBIGUOUS_DELIVERY_ALIASES = ['mode', 'scope'];
+
+// The arguments the tool knows. Anything else is reported back to the caller
+// instead of being silently dropped.
+const KNOWN_ARGUMENTS = new Set([
+  'task', 'repo_path', 'repoPath', 'intent', 'delivery',
+  ...DELIVERY_ALIASES,
+  ...AMBIGUOUS_DELIVERY_ALIASES,
+]);
+
+// The values a delivery flag may carry. EXACT matches only: a substring rule
+// ("anything that contains local") turns "localhost" into "no delivery".
+const DELIVERY_FALSE_VALUES = [
+  'false', 'none', 'disabled', 'no', 'off', '0',
+  'local', 'local-only', 'local only', 'narrow', 'no-pr', 'no pr',
+];
+const DELIVERY_TRUE_VALUES = ['true', 'default', 'enabled', 'yes', 'on', '1', 'full'];
+
+// null means "this value says nothing about the delivery path".
+function parseDeliveryValue(candidate) {
+  if (typeof candidate === 'boolean') return candidate;
+  if (typeof candidate === 'number') return candidate !== 0;
+  const value = String(candidate).trim().toLowerCase();
+  if (DELIVERY_FALSE_VALUES.includes(value)) return false;
+  if (DELIVERY_TRUE_VALUES.includes(value)) return true;
+  return null;
 }
 
-function prepareChecklist({ task, repoPath, repo_path, intent = 'auto', delivery, includeDelivery, include_delivery, defaultDelivery, default_delivery, pr, pullRequest, pull_request, deliverable, deliveryScope, delivery_scope, mode, scope } = {}) {
+/**
+ * Resolve the delivery flag.
+ *
+ * @returns {{enabled: boolean, source: string} | {error: {code: string, argument: string, message: string}}}
+ */
+function resolveDelivery(task, options = {}) {
+  for (const name of AMBIGUOUS_DELIVERY_ALIASES) {
+    if (options[name] === undefined || options[name] === null) continue;
+    return {
+      error: {
+        code: 'ARGUMENT_NOT_SUPPORTED',
+        argument: name,
+        message: `\`${name}\` is not a delivery flag. Use \`delivery: true\` (the default delivery path) or \`delivery: false\` (local only).`,
+      },
+    };
+  }
+
+  const candidates = [['delivery', options.delivery]];
+  for (const name of DELIVERY_ALIASES) candidates.push([name, options[name]]);
+
+  for (const [name, candidate] of candidates) {
+    if (candidate === undefined || candidate === null) continue;
+    const parsed = parseDeliveryValue(candidate);
+    if (parsed !== null) return { enabled: parsed, source: name };
+  }
+  return { enabled: !deliveryDisabledByTask(task), source: 'default' };
+}
+
+function prepareChecklist(options = {}) {
+  const args = options || {};
+  const { task, intent = 'auto' } = args;
   if (typeof task !== 'string' || task.trim().length === 0) {
     return { ok: false, error: 'TASK_REQUIRED', message: 'Передай краткое описание задачи.' };
   }
-  const resolvedRepoPath = typeof repoPath === 'string' && repoPath.trim() ? repoPath : repo_path;
+  const resolvedRepoPath = typeof args.repoPath === 'string' && args.repoPath.trim() ? args.repoPath : args.repo_path;
   if (typeof resolvedRepoPath !== 'string' || resolvedRepoPath.trim().length === 0) {
     return { ok: false, error: 'REPOSITORY_PATH_REQUIRED', message: 'Передай путь к проверяемой кодовой базе.' };
   }
@@ -154,14 +203,20 @@ function prepareChecklist({ task, repoPath, repo_path, intent = 'auto', delivery
     return { ok: false, error: 'INTENT_INVALID', message: 'intent должен быть auto, debugging, test-path или change.' };
   }
 
+  const delivery = resolveDelivery(task, args);
+  if (delivery.error) {
+    return { ok: false, error: delivery.error.code, argument: delivery.error.argument, message: delivery.error.message };
+  }
+
   const inspected = inspectRepository(resolvedRepoPath);
   if (!inspected.ok) return inspected;
   const type = classifyTask(task, intent);
   const definition = catalog.taskTypes[type];
-  const deliveryIsEnabled = resolveDelivery(task, { delivery, includeDelivery, include_delivery, defaultDelivery, default_delivery, pr, pullRequest, pull_request, deliverable, deliveryScope, delivery_scope, mode, scope });
+  const deliveryIsEnabled = delivery.enabled;
   const checklist = deliveryIsEnabled
     ? definition.checklist
     : definition.checklist.filter(item => !item.delivery);
+  const ignoredArguments = Object.keys(args).filter(name => !KNOWN_ARGUMENTS.has(name));
   return {
     ok: true,
     version: catalog.version,
@@ -170,6 +225,7 @@ function prepareChecklist({ task, repoPath, repo_path, intent = 'auto', delivery
     project: inspected.project,
     delivery: deliveryIsEnabled,
     defaultDelivery: deliveryIsEnabled,
+    deliverySource: delivery.source,
     checklist,
     guidance: definition.guidance,
     execution: {
@@ -177,7 +233,8 @@ function prepareChecklist({ task, repoPath, repo_path, intent = 'auto', delivery
       filesChanged: false,
       externalEffects: false,
     },
+    ...(ignoredArguments.length ? { ignoredArguments } : {}),
   };
 }
 
-module.exports = { classifyTask, inspectRepository, prepareChecklist };
+module.exports = { classifyTask, inspectRepository, prepareChecklist, resolveDelivery, DELIVERY_ALIASES, AMBIGUOUS_DELIVERY_ALIASES };

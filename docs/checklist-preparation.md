@@ -56,7 +56,27 @@ Two details in that entry are not cosmetic:
   cannot be reproduced. `npm run check:mcp-servers -- --host-config
   ~/.config/opencode/opencode.json` verifies both.
 
-The `engineering_checklist_prepare` tool accepts the task and an absolute repository/worktree path. It reads shallow project metadata, package script names, selected config file names, and Git branch/change counts. It does not run project scripts, read environment file contents, modify files, or call external services. It returns checklists and capability evidence; the agent remains responsible for selecting relevant TODOs and running any explicitly appropriate project checks.
+The `engineering_checklist_prepare` tool takes four arguments, and only four:
+
+| Argument | Type | Meaning |
+|---|---|---|
+| `task` | string, required | the user task, in the user's own language |
+| `repo_path` | string, required | absolute path to the repository or worktree to inspect |
+| `intent` | `auto` \| `debugging` \| `test-path` \| `change` | the kind of task; `auto` (the default) infers it from the task text |
+| `delivery` | boolean | whether the checklist includes the default delivery path (separate branch/worktree -> PR -> green CI -> merge -> deploy/verify). Defaults to `true` for an ordinary development task; set `false` only when the user explicitly asks for a narrower deliverable |
+
+The delivery flag used to be spelled in thirteen ways (`include_delivery`,
+`default_delivery`, `pull_request`, `pr`, `deliverable`, `delivery_scope` and
+their camelCase spellings) while the schema declared only `delivery`, so a
+caller could not know which name was meant. The aliases still work — nothing
+that works today breaks — and the answer reports which one was honoured
+(`deliverySource`). Two of them, `mode` and `scope`, were never documented and
+were silently read as a delivery flag; they are now refused with an explicit
+error that names `delivery`, because a guess that quietly changes the delivery
+path is worse than a refusal. An argument the tool does not know is reported
+back as `ignoredArguments` instead of being dropped silently.
+
+The tool reads shallow project metadata, package script names, selected config file names, and Git branch/change counts. It does not run project scripts, read environment file contents, modify files, or call external services. It returns checklists and capability evidence; the agent remains responsible for selecting relevant TODOs and running any explicitly appropriate project checks.
 
 The same opt-in server exposes `engineering_ci_wait` for GitHub Actions runs, commit check-runs, or a PR's current head checks. It performs an immediate read. When `GITHUB_EVENT_RELAY_URL` and `GITHUB_EVENT_RELAY_TOKEN` are configured, webhook events wake the active wait and GitHub is reconciled at least every five minutes; otherwise it checks no more often than every three minutes. Timeout defaults to 15 minutes and is capped at 90. It returns on any terminal result, distinguishing success, failure/cancellation, and completed-but-skipped/neutral states. Timeout and rate-limit responses include the last observed state so the agent can decide whether to retry with changed parameters or investigate. The MCP wait is cancellable; OpenCode cancellation stops the current wait so the agent can submit a new call with updated check names or timeout. Public repositories can use anonymous GET. For private repositories, the tool uses an available GitHub token from its credential store/environment or `gh auth token`; it never accepts or prints a token in the prompt. Anonymous GitHub rate limits are shared by source IP, so the waiter stops before another request when its last response shows five or fewer requests remaining.
 
