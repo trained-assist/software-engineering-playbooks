@@ -20,6 +20,8 @@ jobs:
         run: npm test
       - name: Provider manifest contract
         run: npm run manifest:check
+      - name: MCP server composition declaration
+        run: npm run check:mcp-servers
       - name: Core action manifest freshness (what trained-assist-agent registers)
         run: npm run check:action-manifest
       - name: Validation-key reachability (REPORT ONLY — owner decision 2026-10-03)
