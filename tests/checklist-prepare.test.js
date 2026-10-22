@@ -85,6 +85,63 @@ test('invalid repository paths and task inputs return clear read-only errors', (
   assert.equal(prepareChecklist({ task: 'debug', repoPath: '.', intent: 'deploy' }).error, 'INTENT_INVALID');
 });
 
+test('the delivery flag has one canonical name and reports which argument was honoured', t => {
+  const root = fixture(t);
+  write(root, 'package.json', '{"scripts":{"test":"node --test"}}');
+
+  const canonical = prepareChecklist({ task: 'Fix the login page', repoPath: root, delivery: false });
+  assert.equal(canonical.delivery, false);
+  assert.equal(canonical.deliverySource, 'delivery');
+  assert.ok(!canonical.checklist.some(item => item.delivery), 'the delivery path is not in the checklist');
+
+  const enabled = prepareChecklist({ task: 'Fix the login page', repoPath: root });
+  assert.equal(enabled.delivery, true);
+  assert.equal(enabled.deliverySource, 'default');
+
+  // The legacy aliases keep working — nothing that works today breaks — and
+  // the answer says which one was used.
+  for (const alias of ['include_delivery', 'includeDelivery', 'default_delivery', 'defaultDelivery',
+    'pull_request', 'pullRequest', 'pr', 'deliverable', 'delivery_scope', 'deliveryScope']) {
+    const result = prepareChecklist({ task: 'Fix the login page', repoPath: root, [alias]: false });
+    assert.equal(result.delivery, false, `${alias} still disables the delivery path`);
+    assert.equal(result.deliverySource, alias, `${alias} is reported back`);
+  }
+});
+
+test('the ambiguous delivery aliases are refused with the canonical name', t => {
+  const root = fixture(t);
+  write(root, 'package.json', '{"scripts":{"test":"node --test"}}');
+
+  for (const alias of ['mode', 'scope']) {
+    const result = prepareChecklist({ task: 'Fix the login page', repoPath: root, [alias]: 'local' });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'ARGUMENT_NOT_SUPPORTED');
+    assert.equal(result.argument, alias);
+    assert.match(result.message, /delivery: true/);
+  }
+});
+
+test('a delivery value is matched exactly, not by substring', t => {
+  const root = fixture(t);
+  write(root, 'package.json', '{"scripts":{"test":"node --test"}}');
+
+  // "localhost" contains "local": the old substring rule switched the
+  // delivery path off for a value that says nothing about it.
+  const result = prepareChecklist({ task: 'Fix the login page', repoPath: root, delivery: 'localhost' });
+  assert.equal(result.delivery, true);
+  assert.equal(result.deliverySource, 'default');
+});
+
+test('an argument the tool does not know is reported back, not silently dropped', t => {
+  const root = fixture(t);
+  write(root, 'package.json', '{"scripts":{"test":"node --test"}}');
+
+  const result = prepareChecklist({ task: 'Fix the login page', repoPath: root, notes: 'a note' });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.ignoredArguments, ['notes']);
+  assert.equal(prepareChecklist({ task: 'Fix the login page', repoPath: root }).ignoredArguments, undefined);
+});
+
 test('MCP surface exposes checklist preparation and bounded CI wait tools', async t => {
   const root = fixture(t);
   write(root, 'package.json', '{"scripts":{"test":"node --test"}}');

@@ -53,9 +53,9 @@ const TOOL = {
       task: { type: 'string', description: 'The user task, in their original language.' },
       repo_path: { type: 'string', description: 'Absolute path to the relevant local repository/worktree.' },
       intent: { type: 'string', enum: ['auto', 'debugging', 'test-path', 'change'], description: 'Optional task kind. Use auto unless the task kind is clear.' },
-      delivery: { type: 'boolean', description: 'Optional. Defaults to true for ordinary development tasks; set false only when the user explicitly asks for a narrower deliverable (for example local-only or no PR).' },
+      delivery: { type: 'boolean', description: 'Optional. Defaults to true for ordinary development tasks; set false only when the user explicitly asks for a narrower deliverable (for example local-only or no PR). This is the canonical name of the flag; the legacy aliases (include_delivery, default_delivery, pull_request, pr, deliverable, delivery_scope and their camelCase spellings) still work, but `mode` and `scope` do NOT: they were never documented and are refused with an explicit error.' },
     },
-    additionalProperties: true,
+    additionalProperties: false,
   },
 };
 
@@ -145,7 +145,10 @@ function createChecklistsProvider(deps = {}) {
       let result;
 
       if (name === TOOL.name) {
-        result = prepareChecklist({ task: args.task, repoPath: args.repo_path, intent: args.intent || 'auto', ...args });
+        // The four canonical arguments of the tool (task, repo_path, intent,
+        // delivery) and the legacy aliases of the delivery flag — the domain
+        // module owns that contract, the provider only passes them through.
+        result = prepareChecklist({ ...args, repoPath: args.repo_path });
       } else if ((name === AGENT_RUN_START_TOOL.name || name === AGENT_RUN_WAIT_TOOL.name) && !config) {
         result = runnerMissingError(name);
       } else {
